@@ -1,0 +1,4 @@
+12341	Yuri	Stryker	85	91
+12342	Paige	Knight	92	88
+12343	Apollo	Danzig	80	77
+12344	Gerard	Way	96	89
