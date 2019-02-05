@@ -9,7 +9,7 @@ def GMProblem3( ) :
 
 def GMProblem3PartATrain( aorNeuron ) :
     # Open the Training Data File
-    koFile = open( "Training2.txt", "r" )
+    koFile = open( "Training.txt", "r" )
 
     # Instantiate empty lists for training inputs and outputs
     kdTrainIn  = []

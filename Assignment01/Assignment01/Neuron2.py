@@ -39,6 +39,3 @@ class GTcNeuron2( ):
                 aorSelf.vdW[ 0 ] = aorSelf.vdW[ 0 ] - ( aorSelf.vdLR * kdGradient[ 0 ][ 0 ] )
                 aorSelf.vdW[ 1 ] = aorSelf.vdW[ 1 ] - ( aorSelf.vdLR * kdGradient[ 1 ][ 0 ] )
                 aorSelf.vdB      = aorSelf.vdB      - ( aorSelf.vdLR * kdGradient[ 2 ][ 0 ] )
-
-                if kiEpoch == ( aiEpochs - 1 ) :
-                    print( "Actual = ", kdAct )

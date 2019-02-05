@@ -47,6 +47,7 @@
     <Content Include="TestData.txt" />
     <Content Include="Training.txt" />
     <Content Include="Training2.txt" />
+    <Content Include="Training3.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

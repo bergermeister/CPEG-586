@@ -48,18 +48,19 @@ def GMProblem2( ) :
 
     # Calculate Coefficient and Result from derivate of E with respect to coefficient c
     for kiIdx in range( 0, 6, 1 ) : 
-        kdC[ 2, 0 ] += 2 * ( kdX[ kiIdx ] * kdX[ kiIdx ] * kdX[ kiIdx ] )                   # 2ax^2
-        kdC[ 2, 1 ] += 2 * ( kdX[ kiIdx ] * kdX[ kiIdx ] )                                  # 2bx^1
+        kdC[ 2, 0 ] += 2 * ( kdX[ kiIdx ] * kdX[ kiIdx ] )                                  # 2ax^2
+        kdC[ 2, 1 ] += 2 * ( kdX[ kiIdx ] )                                                 # 2bx^1
         kdC[ 2, 2 ] += 2 * ( kdX[ kiIdx ] )                                                 # 2c
         kdR[ 2, 0 ] += 2 * ( kdY[ kiIdx ] )                                                 # 2y
 
-    # Compute the inverse of the Coefficient Matrix: ( (C.T) * C ).I
-    kdCi = voNP.linalg.inv( kdC.T * kdC )    
+    # Compute the inverse of the Coefficient Matrix:
+    kdCi = voNP.linalg.inv( kdC )
 
     # Compute the Coefficient Vector by taking the dot product of the Coefficient Matrix with the Result Matrix
     kdM = voNP.dot( kdCi, kdR )
 
-    print( "a = ", kdM[ 2, 0 ], " b = ", kdM[ 1, 0 ], " c = ", kdM[ 2, 0 ] )
+    # Print the Coefficients
+    print( "a = ", kdM[ 0, 0 ], " b = ", kdM[ 1, 0 ], " c = ", kdM[ 2, 0 ] )
 
     # do a scatter plot of the data
     kiArea = 3
@@ -70,7 +71,7 @@ def GMProblem2( ) :
     voPlot.ylabel( 'y' )
 
     #plot the fitted line
-    kdFitted = ( kdX * kdX ) * kdM[ 2, 0 ] + ( kdX ) * kdM[ 1, 0 ] + kdM[ 0, 0 ]
+    kdFitted = ( kdX * kdX ) * kdM[ 0, 0 ] + ( kdX ) * kdM[ 1, 0 ] + kdM[ 2, 0 ]
     koLine,=voPlot.plot( kdX, kdFitted, '--', linewidth = 2 ) #line plot
     koLine.set_color( 'red' )
     voPlot.show( )
