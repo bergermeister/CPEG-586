@@ -49,10 +49,10 @@ class TcNeuronLayer( ) :
     def MRLU( aorSelf, adActual ) :
         kdResult = adActual
         for kiIdx in range( len( kdResult ) ) :
-            if kdResult[ kiIdx ] <= 0 :
+            if kdResult[ kiIdx ] < 0 :
                 kdResult[ kiIdx ] = 0
             else :
-                kdResult[ kiIdx ] = 1
+                kdResult[ kiIdx ] = adActual[ kiIdx ]
         return( kdResult )
 
     def MBackpropagate( aorSelf, adGradW, adGradB ) :

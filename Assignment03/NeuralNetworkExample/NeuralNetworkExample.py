@@ -80,7 +80,7 @@ def main( ) :
     # Run the SGD Neural Networks
     kiValuesNeuron = [ 25, 50, 100, 150 ]
     kdAccuracy = voNP.empty( ( 3, 2, 4, 6 ), dtype = 'float64' )
-    for kiAct in range( 1 ) :
+    for kiAct in range( 3 ) :
         for kiMethod in range( 2 ) :
             for kiNeurons in range( 4 ) : # len( kiValuesNeuron ) ) :
                 koLabel = "|A:" + str( kiAct ) + "|M:" + str( kiMethod ) + "|N:" + str( kiValuesNeuron[ kiNeurons ] )
