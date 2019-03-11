@@ -1,0 +1,23 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2003
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "MultilayerNN", "MultilayerNN\MultilayerNN.pyproj", "{EFE40B43-B1CE-4F10-9322-0FD7B69C2375}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EFE40B43-B1CE-4F10-9322-0FD7B69C2375}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EFE40B43-B1CE-4F10-9322-0FD7B69C2375}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {66FBAEEE-ADFB-4CFE-94E6-C7E9C53AE224}
+	EndGlobalSection
+EndGlobal
