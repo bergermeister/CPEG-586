@@ -1,6 +1,6 @@
 import math
 import numpy as voNP
-from sklearn.utils import voShuffle
+from sklearn.utils import shuffle as voShuffle
 from TcNeuronLayer import TcNeuronLayer
 from TcTypeGradDesc import TcTypeGradDesc
 from TcTypeActivation import TcTypeActivation
@@ -9,8 +9,6 @@ from TcTypeActivation import TcTypeActivation
 class TcNeuralNetwork( ) :
     def __init__( aorSelf, aoShape, aiCountLayer, adDropOut = 0.2, aeActHidden = TcTypeActivation.XeSigmoid, aeActLast = TcTypeActivation.XeSigmoid ) :
         # Record number of inputs and hidden layers
-        aorSelf.viCountInput = aiCountInput
-        aorSelf.viCountLayer = aiCountLayer
         aorSelf.veActHidden  = aeActHidden
         aorSelf.veActLast    = aeActLast
 
@@ -19,13 +17,13 @@ class TcNeuralNetwork( ) :
         for kiI in range( len( aiCountLayer ) ) :
             # Handle First Layer
             if( kiI == 0 ) :
-                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aoShape[ 0 ] ), 0.1, False, adDropOut, aeActHidden ) )
+                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aoShape[ 0 ] ), False, adDropOut, aeActHidden ) )
             # Handle Last Layer
             elif( kiI == len( aiCountLayer ) - 1 ) :
-                aorSelf.voLayer.append( TcNeuronLater( ( aoShape[ 1 ], aiCountLayer[ kiI - 1 ] ), 0.1, False, adDropOut, aeActLast ) )
+                aorSelf.voLayer.append( TcNeuronLayer( ( aoShape[ 1 ], aiCountLayer[ kiI - 1 ] ), False, adDropOut, aeActLast ) )
             # Handle Hidden Layers
             else:
-                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aiCountLayer[ kiI - 1 ] ), 0.1, False, adDropOut, aeActLast ) )            
+                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aiCountLayer[ kiI - 1 ] ), False, adDropOut, aeActLast ) )            
 
     def MForwardPass( aorSelf, adX ) :
         # Run Forward Pass on first layer
@@ -38,7 +36,7 @@ class TcNeuralNetwork( ) :
         # Return result
         return( kdA )
 
-    def MTrain( adX, adY, aorSelf, aiEpochs, adLR, adLambda, aeGradDesc, aiBatchSize ) :
+    def MTrain( aorSelf, adX, adY, aiEpochs, adLR, adLambda, aeGradDesc, aiBatchSize ) :
         # Obtain the index of the last layer
         kiLast = len( aorSelf.voLayer ) - 1    
 
@@ -47,7 +45,9 @@ class TcNeuralNetwork( ) :
             kdLoss = 0.0
             
             # Shuffle the input/output pairs
-            kdX, kdY = voShuffle( adX, adY, random_state=0 )
+            # kdX, kdY = voShuffle( adX, adY, random_state=0 )
+            kdX = adX
+            kdY = adY
 
             for kiI in range( kdX.shape[ 0 ] ) :
                 # Execute a Foward Pass
@@ -59,9 +59,18 @@ class TcNeuralNetwork( ) :
                 # Calculate Deltas and Gradients
                 aorSelf.MCalculateDeltaGrads( kdX[ kiI ], kdY[ kiI ] )
 
+                # If Gradient Descent is Stochastic
+                if( aeGradDesc == TcTypeGradDesc.XeStochastic ) :
+                    aorSelf.MBackPropagate( adLR, adLambda, 1 )
+                elif( aeGradDesc ==  TcTypeGradDesc.XeMiniBatch ) :
+                    if( ( kiI % aiBatchSize ) == 0 ) :
+                        aorSelf.MBackPropagate( adLR, adLambda, aiBatchSize )
+            if( aeGradDesc == TcTypeGradDesc.XeBatch ) :
+                aorSelf.MBackPropagate( adLR, adLambda, aiBatchSize )
+
     def MLoss( aorSelf, adA, adY ) :   
         # if the last layer activation function is SoftMax
-        if( aorSelf.veActLast == TcTypeActivation.XeSOFTMAX ) :
+        if( aorSelf.veActLast == TcTypeActivation.XeSoftMax ) :
             kdLoss = -( adY * voNP.log( adA + 0.01 ) ).sum( )
         # Else handle all other activation functions
         else :
@@ -69,7 +78,7 @@ class TcNeuralNetwork( ) :
             kdLoss = ( kdDelta * kdDelta ).sum( )
         return( kdLoss )
 
-    def MCalculateDeltaGrads( adX, adY ) :
+    def MCalculateDeltaGrads( aorSelf, adX, adY ) :
         # Obtain the index of the last layer
         kiLayer = len( aorSelf.voLayer ) - 1
 
@@ -77,16 +86,17 @@ class TcNeuralNetwork( ) :
         while( kiLayer >= 0 ) :
             # Handle Last Layer
             if( kiLayer == ( len( aorSelf.voLayer ) - 1 ) ) :
-                if( aorSelf.veActLast == TcTypeActivation.XeSOFTMAX ) :
-                    aorSelf.voLayer[ kiLayer ].vdD = -adY + aorSelf.voLayer[ kiI ].vdA
+                if( aorSelf.veActLast == TcTypeActivation.XeSoftMax ) :
+                    aorSelf.voLayer[ kiLayer ].vdD = -adY + aorSelf.voLayer[ kiLayer ].vdA
                 else :
-                    aorSelf.voLayer[ kiLayer ].vdD = -( adY - aorSelf.voLayer[ kiI ] ) * aorSelf.voLayer[ kiI ].vdAd
+                    aorSelf.voLayer[ kiLayer ].vdD = -( adY - aorSelf.voLayer[ kiLayer ].vdA ) * aorSelf.voLayer[ kiLayer ].vdAd
+            # Handle Intermediate Layers
             else :
-                aorSelf.voLayer[ kiLayer ].vdD = voNP.dot( aorSelf.voLayer[ kiLayer + 1 ].vdW.T, aorSelf.voLayer[ kiLayer + 1 ].voD ) * aorSelf.voLayer[ kiLayer ].voAd
+                aorSelf.voLayer[ kiLayer ].vdD = voNP.dot( aorSelf.voLayer[ kiLayer + 1 ].vdW.T, aorSelf.voLayer[ kiLayer + 1 ].vdD ) * aorSelf.voLayer[ kiLayer ].vdAd
 
             # Determine the input
             if( kiLayer > 0 ) :
-                kdInput = aorSelf.voLayyer[ kiLast - 1 ].vdA    # Input is the result of previous layer
+                kdInput = aorSelf.voLayer[ kiLayer - 1 ].vdA    # Input is the result of previous layer
             else : # Layer == 0
                 kdInput = adX
 
@@ -96,5 +106,11 @@ class TcNeuralNetwork( ) :
 
             # Update Layer Index
             kiLayer = kiLayer - 1
+
+    def MBackPropagate( aorSelf, adLR, adLambda, aiBatch ) :
+        # Backpropagate each layer
+        for kiLayer in range( len( aorSelf.voLayer ) ) :
+            aorSelf.voLayer[ kiLayer ].MBackpropagate( adLR, aiBatch )
+            aorSelf.voLayer[ kiLayer ].MZeroGradients( )
 
    
