@@ -3,24 +3,27 @@ from TcTypeActivation import TcTypeActivation
 
 # Neuron Layer Class
 class TcNeuronLayer( object ) :
-    def __init__( aorSelf, aorShape, adLR, abLast = False, adDropOut = 0.2, aeActivation = TcTypeActivation.XeSigmoid ) :
+    def __init__( aorSelf, aorShape, abLast = False, adDropOut = 0.2, aeActivation = TcTypeActivation.XeSigmoid ) :
         # Initialize matrix of weights and biases
-        aorSelf.vdW = voNP.random.uniform( low=-0.1, high=0.1, size=aorShape )
-        aorSelf.vdB = voNP.random.uniform( low=-1, high=1, size=( aorShape[ 0 ], 1 ) )
+        aorSelf.vdW  = voNP.random.uniform( low=-0.1, high=0.1, size=aorShape )
+        aorSelf.vdWg = voNP.zeros( aorShape )
+        aorSelf.vdB  = voNP.random.uniform( low=-1, high=1, size=( aorShape[ 0 ], 1 ) )
+        aorSelf.vdBg = voNP.zeros( ( aorShape[ 0 ], 1 ) )
 
         # Store learning rate, last layer flag, drop out rate, and activation type
-        aorSelf.vdLR = adLR;
         aorSelf.vbLast = abLast
         aorSelf.vdDropOut = adDropOut
         aorSelf.veAct = aeActivation
 
-        # Initialize Result (A) and derivative to zero vector
+        # Initialize Result (A), derivative (Ad), and delta (D) to zero vector
         aorSelf.vdA = voNP.zeros( ( aorShape[ 0 ], 1 ) )
         aorSelf.vdAd = voNP.zeros( ( aorShape[ 0 ], 1 ) )
+        aorSelf.vdD = voNP.zeros( ( aorShape[ 0 ], 1 ) )
 
     def MForwardPass( aorSelf, adX ) :
         kdSum       = aorSelf.MSummation( adX )
-        aorSelf.vdA = aorSelf.MActivation( kdSum )
+        kdA         = aorSelf.MActivation( kdSum )
+        aorSelf.vdA = aorSelf.MZeroOut( kdA )
         return( aorSelf.vdA )
     
     def MSummation( aorSelf, adX ) :
@@ -39,8 +42,11 @@ class TcNeuronLayer( object ) :
         # Sigmoid
         else : # aorSelf.veAct == TeTypeActivation.XeSigmoid
             kdOut = aorSelf.MSigmoid( adActual )
-
         return( kdOut )
+
+    def MZeroOut( aorSelf, adActual ) :
+        # TODO
+        return( adActual )
 
     def MSigmoid( aorSelf, adActual ) :
         return( 1 / ( 1 + voNP.exp( -adActual ) ) )
@@ -55,6 +61,6 @@ class TcNeuronLayer( object ) :
         kdE = voNP.exp( adActual )
         return( kdE / kdE.sum( ) )
 
-    def MBackpropagate( aorSelf, adGradW, adGradB ) :
-        aorSelf.vdW = aorSelf.vdW - ( aorSelf.vdLR * adGradW )
-        aorSelf.vdB = aorSelf.vdB - ( aorSelf.vdLR * adGradB )
+    def MBackpropagate( aorSelf, adGradW, adGradB, adLR ) :
+        aorSelf.vdW = aorSelf.vdW - ( adLR * adGradW )
+        aorSelf.vdB = aorSelf.vdB - ( adLR * adGradB )
