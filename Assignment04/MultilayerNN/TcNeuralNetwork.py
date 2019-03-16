@@ -23,7 +23,7 @@ class TcNeuralNetwork( ) :
                 aorSelf.voLayer.append( TcNeuronLayer( ( aoShape[ 1 ], aiCountLayer[ kiI - 1 ] ), False, adDropOut, aeActLast ) )
             # Handle Hidden Layers
             else:
-                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aiCountLayer[ kiI - 1 ] ), False, adDropOut, aeActLast ) )            
+                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aiCountLayer[ kiI - 1 ] ), False, adDropOut, aeActHidden ) )            
 
     def MForwardPass( aorSelf, adX ) :
         # Run Forward Pass on first layer
