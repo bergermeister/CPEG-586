@@ -35,7 +35,7 @@ def main( ) :
     kdTrainX = kdTrainX.reshape( kdTrainX.shape[ 0 ], kdTrainX.shape[ 1 ] * kdTrainX.shape[ 2 ], 1 )
     kdTestX  = kdTestX.reshape ( kdTestX.shape[ 0 ],  kdTestX.shape[ 1 ]  * kdTestX.shape[ 2 ], 1 )
 
-    kiCount = 50
+    kiCount = 30
     kdAccuracy = voNP.zeros( ( kiCount, 1), dtype = 'float64' )
 
     koShape  = [ kdTrainX.shape[ 1 ], kiTrainY.shape[ 1 ] ]
@@ -43,10 +43,11 @@ def main( ) :
     koNN = TcNeuralNetwork( koShape, koLayers, TcTypeActivation.XeSigmoid, TcTypeActivation.XeSoftMax )
 
     for kiLoop in range( kiCount ) :
-        koNN.MTrain( kdTrainX, kiTrainY, 1, 0.01, TcTypeGradDesc.XeStochastic, 1 )
+        kdL = koNN.MTrain( kdTrainX, kiTrainY, 1, 0.1, TcTypeGradDesc.XeMiniBatch, 10 )
+        print( "Loss = ", kdL )
         for kiI in range( kiTestY.shape[ 0 ] ) :
-            kdY = koNN.MForwardPass( kdTestX[ kiI ] )
-            kiMax = kdY.argmax( axis = 0 )
+            kdY = koNN.MForwardPass( kdTestX[ kiI : kiI + 1 ] )
+            kiMax = kdY.argmax( axis = 1 )
             if( kiTestY[ kiI, kiMax ] == 1 ) :
                 kdAccuracy[ kiLoop ] += 1
         kdAccuracy[ kiLoop ] = kdAccuracy[ kiLoop ] / 10000.0
