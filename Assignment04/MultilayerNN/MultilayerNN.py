@@ -35,16 +35,15 @@ def main( ) :
     kdTrainX = kdTrainX.reshape( kdTrainX.shape[ 0 ], kdTrainX.shape[ 1 ] * kdTrainX.shape[ 2 ], 1 )
     kdTestX  = kdTestX.reshape ( kdTestX.shape[ 0 ],  kdTestX.shape[ 1 ]  * kdTestX.shape[ 2 ], 1 )
 
-    kiCount = 10
-    kiValuesNeuron = [ 25, 50, 100, 150 ]
+    kiCount = 50
     kdAccuracy = voNP.zeros( ( kiCount, 1), dtype = 'float64' )
 
     koShape  = [ kdTrainX.shape[ 1 ], kiTrainY.shape[ 1 ] ]
-    koLayers = [ 100, 50, 10 ]
-    koNN = TcNeuralNetwork( koShape, koLayers, 0.2, TcTypeActivation.XeTanH, TcTypeActivation.XeSoftMax )
+    koLayers = [ 50, 10 ]
+    koNN = TcNeuralNetwork( koShape, koLayers, TcTypeActivation.XeSigmoid, TcTypeActivation.XeSoftMax )
 
     for kiLoop in range( kiCount ) :
-        koNN.MTrain( kdTrainX, kiTrainY, 25, 0.1, 0.1, TcTypeGradDesc.XeMiniBatch, 10 )
+        koNN.MTrain( kdTrainX, kiTrainY, 1, 0.01, TcTypeGradDesc.XeStochastic, 1 )
         for kiI in range( kiTestY.shape[ 0 ] ) :
             kdY = koNN.MForwardPass( kdTestX[ kiI ] )
             kiMax = kdY.argmax( axis = 0 )

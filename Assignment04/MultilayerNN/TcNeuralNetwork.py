@@ -7,7 +7,7 @@ from TcTypeActivation import TcTypeActivation
 
 # Neural Network
 class TcNeuralNetwork( ) :
-    def __init__( aorSelf, aoShape, aiCountLayer, adDropOut = 0.2, aeActHidden = TcTypeActivation.XeSigmoid, aeActLast = TcTypeActivation.XeSigmoid ) :
+    def __init__( aorSelf, aoShape, aiCountLayer, aeActHidden = TcTypeActivation.XeSigmoid, aeActLast = TcTypeActivation.XeSigmoid ) :
         # Record number of inputs and hidden layers
         aorSelf.veActHidden  = aeActHidden
         aorSelf.veActLast    = aeActLast
@@ -17,13 +17,13 @@ class TcNeuralNetwork( ) :
         for kiI in range( len( aiCountLayer ) ) :
             # Handle First Layer
             if( kiI == 0 ) :
-                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aoShape[ 0 ] ), False, adDropOut, aeActHidden ) )
+                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aoShape[ 0 ] ), False, aeActHidden ) )
             # Handle Last Layer
             elif( kiI == len( aiCountLayer ) - 1 ) :
-                aorSelf.voLayer.append( TcNeuronLayer( ( aoShape[ 1 ], aiCountLayer[ kiI - 1 ] ), False, adDropOut, aeActLast ) )
+                aorSelf.voLayer.append( TcNeuronLayer( ( aoShape[ 1 ], aiCountLayer[ kiI - 1 ] ), False, aeActLast ) )
             # Handle Hidden Layers
             else:
-                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aiCountLayer[ kiI - 1 ] ), False, adDropOut, aeActHidden ) )            
+                aorSelf.voLayer.append( TcNeuronLayer( ( aiCountLayer[ kiI ], aiCountLayer[ kiI - 1 ] ), False, aeActHidden ) )            
 
     def MForwardPass( aorSelf, adX ) :
         # Run Forward Pass on first layer
@@ -36,7 +36,7 @@ class TcNeuralNetwork( ) :
         # Return result
         return( kdA )
 
-    def MTrain( aorSelf, adX, adY, aiEpochs, adLR, adLambda, aeGradDesc, aiBatchSize ) :
+    def MTrain( aorSelf, adX, adY, aiEpochs, adLR, aeGradDesc, aiBatchSize ) :
         # Obtain the index of the last layer
         kiLast = len( aorSelf.voLayer ) - 1    
 
@@ -61,12 +61,13 @@ class TcNeuralNetwork( ) :
 
                 # If Gradient Descent is Stochastic
                 if( aeGradDesc == TcTypeGradDesc.XeStochastic ) :
-                    aorSelf.MBackPropagate( adLR, adLambda, 1 )
+                    aorSelf.MBackPropagate( adLR, 1 )
                 elif( aeGradDesc ==  TcTypeGradDesc.XeMiniBatch ) :
-                    if( ( kiI % aiBatchSize ) == 0 ) :
-                        aorSelf.MBackPropagate( adLR, adLambda, aiBatchSize )
+                    if( ( kiI % aiBatchSize ) == ( aiBatchSize - 1 ) ) :
+                        aorSelf.MBatchNormalization( kdX[ ( kiI - aiBatchSize + 1 ) : kiI + 1 ], 1, 1 )
+                        aorSelf.MBackPropagate( adLR, aiBatchSize )
             if( aeGradDesc == TcTypeGradDesc.XeBatch ) :
-                aorSelf.MBackPropagate( adLR, adLambda, aiBatchSize )
+                aorSelf.MBackPropagate( adLR, aiBatchSize )
 
     def MLoss( aorSelf, adA, adY ) :   
         # if the last layer activation function is SoftMax
@@ -107,10 +108,11 @@ class TcNeuralNetwork( ) :
             # Update Layer Index
             kiLayer = kiLayer - 1
 
-    def MBackPropagate( aorSelf, adLR, adLambda, aiBatch ) :
+    def MBackPropagate( aorSelf, adLR, aiBatch ) :
         # Backpropagate each layer
         for kiLayer in range( len( aorSelf.voLayer ) ) :
             aorSelf.voLayer[ kiLayer ].MBackpropagate( adLR, aiBatch )
-            aorSelf.voLayer[ kiLayer ].MZeroGradients( )
 
-   
+    def MBatchNormalization( aorSelf, adX, adY, adB ) :
+         kdMean = adX.sum( axis = 0 ) / len( adX )
+         kdVar  = ( ( adX - kdMean ) ** 2 ).sum( axis = 0 )
