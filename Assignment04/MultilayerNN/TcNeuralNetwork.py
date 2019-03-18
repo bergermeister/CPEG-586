@@ -96,11 +96,15 @@ class TcNeuralNetwork( ) :
                 # Handle Intermediate Layers
                 else :
                     kdD = voNP.dot( aorSelf.voLayer[ kiL + 1 ].vdW.T, kdD ) * aorSelf.voLayer[ kiL ].vdAd[ kiI ]
-                    # Apply Batch Normalization
-                    if( kiN > 1 ) : 
-                        kdD *= ( aorSelf.voLayer[ kiL ].vdScale )
-                        kdD /= ( float( kiN ) * ( ( ( aorSelf.voLayer[ kiL ].vdV + 1e-8 ) ** 0.5 ) ) )
-                        kdD *= ( float( kiN - 1 ) - ( aorSelf.voLayer[ kiL ].vdSh[ kiI ] ** 2 ) ) 
+
+                    # Update Scale And Offset Gradients
+                    aorSelf.voLayer[ kiL ].vdKg += ( kdD * aorSelf.voLayer[ kiL ].vdSh[ kiI ] ) / kiN
+                    aorSelf.voLayer[ kiL ].vdOg += kdD / kiN
+
+                    # Apply Batch Normalization 
+                    kdD *= ( aorSelf.voLayer[ kiL ].vdK )
+                    kdD /= ( float( kiN ) * ( ( ( aorSelf.voLayer[ kiL ].vdV + 1e-8 ) ** 0.5 ) ) )
+                    kdD *= ( float( kiN - 1 ) - ( aorSelf.voLayer[ kiL ].vdSh[ kiI ] ** 2 ) ) 
 
                 # Determine the input
                 if( kiL > 0 ) :
