@@ -67,7 +67,7 @@ class TcNeuronLayer( object ) :
             # Calculate Batch Normalized Output
             kdSb = ( aorSelf.vdK * kdSh ) + aorSelf.vdO
             # Pass Batch Normalized Output to Activation Function
-            kdA = aorSelf.MActivation( kdS ) #b )
+            kdA = aorSelf.MActivation( kdSb )
         # Else this is an intermediate layer
         else :
             # Calculate the Mean  
@@ -79,7 +79,7 @@ class TcNeuronLayer( object ) :
             # Calculate Batch Normalized Output
             kdSb = ( aorSelf.vdK * kdSh ) + aorSelf.vdO
             # Pass Batch Normalized Output to Activation Function
-            kdA = aorSelf.MActivation( kdS ) #b )
+            kdA = aorSelf.MActivation( kdSb )
             # Save calculations
             aorSelf.vdM  = kdM  # Store Batch Mean
             aorSelf.vdV  = kdV  # Store Batch Variance

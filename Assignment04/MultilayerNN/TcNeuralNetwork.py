@@ -98,8 +98,8 @@ class TcNeuralNetwork( ) :
                     kdD = voNP.dot( aorSelf.voLayer[ kiL + 1 ].vdW.T, kdD ) * aorSelf.voLayer[ kiL ].vdAd[ kiI ]
 
                     # Update Scale And Offset Gradients
-                    aorSelf.voLayer[ kiL ].vdKg += ( kdD * aorSelf.voLayer[ kiL ].vdSh[ kiI ] ) / kiN
-                    aorSelf.voLayer[ kiL ].vdOg += kdD / kiN
+                    aorSelf.voLayer[ kiL ].vdKg += ( kdD * aorSelf.voLayer[ kiL ].vdSh[ kiI ] )
+                    aorSelf.voLayer[ kiL ].vdOg += kdD
 
                     # Apply Batch Normalization 
                     kdD *= ( aorSelf.voLayer[ kiL ].vdK )
