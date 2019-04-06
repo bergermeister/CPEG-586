@@ -21,7 +21,22 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="TcLayer.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="TcLayerC.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="TcFeatureMap.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="PartB.py" />
+    <Compile Include="TeActivation.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="TePool.py">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
