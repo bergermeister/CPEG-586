@@ -6,22 +6,25 @@ class TcLayer( object ) :
    def __init__( aorSelf, aorShape, aeActivation, abLast, adDropOut = 1.0, adMomentum = 0.8 ) :
       # Save the shape (Number of Neurons, Number of Inputs)
       aorSelf.voShape = aorShape
+      aorSelf.viSizeNeurons = aorShape[ 0 ]  # Number of Neurons ( Outputs )
+      aorSelf.viSizeInput   = aorShape[ 1 ]  # Number of Inputs
+      aorSelf.viSizeBatch   = aorShape[ 2 ]  # Size of batch
 
       # Initialize weights, biases, weight gradients, and bias gradients
-      aorSelf.vdW  = voNP.random.uniform( low=-0.1, high=0.1, size=aorShape )
+      aorSelf.vdW  = voNP.random.uniform( low=-0.1, high=0.1, size=( aorSelf.viSizeNeurons, aorSelf.viSizeInput ) )
       aorSelf.vdB  = voNP.random.uniform( low=-1, high=1, size=( aorShape[ 0 ], 1 ) )
       aorSelf.vdWg = voNP.zeros( aorShape )
       aorSelf.vdBg = voNP.zeros( ( aorShape[ 0 ], 1 ) )
 
       # Initialize Adaptive Moment Estimation (Adam) variables
-      aorSelf.vdWm = voNP.zeros( aorShape )               # Past Gradient
-      aorSelf.vdWv = voNP.zeros( aorShape )               # Past Squared Gradient
-      aorSelf.vdBm = voNP.zeros( ( aorShape[ 0 ], 1 ) )   # Past Gradient
-      aorSelf.vdBv = voNP.zeros( ( aorShape[ 0 ], 1 ) )   # Past Squared Gradient
-      aorSelf.vdKm = 0.0                                  # Past Gradient
-      aorSelf.vdKv = 0.0                                  # Past Squared Gradient
-      aorSelf.vdOm = 0.0                                  # Past Gradient
-      aorSelf.vdOv = 0.0                                  # Past Squared Gradient
+      aorSelf.vdWm = voNP.zeros( ( aorSelf.viSizeNeurons, aorSelf.viSizeInput ) ) # Past Gradient
+      aorSelf.vdWv = voNP.zeros( ( aorSelf.viSizeNeurons, aorSelf.viSizeInput ) ) # Past Squared Gradient
+      aorSelf.vdBm = voNP.zeros( ( aorShape[ 0 ], 1 ) )                           # Past Gradient
+      aorSelf.vdBv = voNP.zeros( ( aorShape[ 0 ], 1 ) )                           # Past Squared Gradient
+      aorSelf.vdKm = 0.0                                                          # Past Gradient
+      aorSelf.vdKv = 0.0                                                          # Past Squared Gradient
+      aorSelf.vdOm = 0.0                                                          # Past Gradient
+      aorSelf.vdOv = 0.0                                                          # Past Squared Gradient
       aorSelf.vdB1 = 0.9
       aorSelf.vdB2 = 0.999
       aorSelf.vdT  = 0

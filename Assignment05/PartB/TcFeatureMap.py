@@ -11,7 +11,7 @@ class TcFeatureMap( object ) :
       aorSelf.veAct       = aeActivation
       aorSelf.vdDeltaSS = voNP.array( ( aiBatchSize, 1 ) )
       aorSelf.vdDeltaCV = voNP.array( ( aiBatchSize, 1 ) )
-      aorSelf.vdOutputSS = voNP.aarray( ( aiBatchSize, 1 ) )
+      aorSelf.vdOutputSS = voNP.array( ( aiBatchSize, 1 ) )
       aorSelf.vdActCV = voNP.array( ( aiBatchSize, 1 ) )
       aorSelf.vdAPrime = voNP.array( ( aiBatchSize, 1 ) )
       aorSelf.vdSum = voNP.array( ( aiBatchSize, 1 ) )
@@ -27,11 +27,18 @@ class TcFeatureMap( object ) :
          aorSelf.vdActCV[ aiI ] = TeActivation.MSigmoid( aorSelf.vdSum[ aiI ] )
          aorSelf.vdAPrime[ aiI ] = 1 - ( vdActCV[ aiI ] * vdActCV[ aiI ] )
       elif( aorSelf.veAct == TeActivation.XeRELU ) :
+         # No APrime for RELU, delta is made zero for negative sums
          aorSelf.vdActCV[ aiI ] = TeActivation.MRELU( aorSelf.vdSum[ aiI ] )
 
       # Apply pooling
       if( aorSelf.vePool == TePool.XeAvg ) :
-         kdAvg = voNP.average( aorSelf.vdActCV[ aiI ] )
-         for kiR in range( aorSelf.vdActCV[ aiI ].shape[ 0 ] ) :
-            for kiC in range( aorSelf.vdActCV[ aiI ].shape[ 1 ] ) :
-               aorSelf.vdActCV[ aiI ][ kiR ][ kiC ] = kdAvg
+         kdRes = TePool.MAverage( aorSelf.vdActCV[ aiI ] )
+      elif( aorSelf.vePool == TePool.XeMax ) :
+         kdRes = TePool.MMax( aorSelf.vdActCV[ aiI ] )
+      else :
+         kdRes = aorSelf.vdActCV[ aiI ]
+
+      # Record the result
+      aorSelf.vdOutputSS[ aiI ] = kdRes
+
+      return( kdRes )

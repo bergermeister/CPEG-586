@@ -4,28 +4,42 @@ from sklearn.utils import shuffle as voShuffle
 
 # Deep Convolutional Neural Network
 class TcCNNDeep( object ) :
-   def __init__( aorSelf, aorLayersC, aorLayers ) :
+   def __init__( aorSelf, aorLayersC, aorLayers, aiSizeBatch ) :
       # Save the CNN Layers and NN Layers
-      aorSelf.voLayersC = aorLayersC
-      aorSelf.voLayersN = aorLayers
+      aorSelf.voLayersC   = aorLayersC
+      aorSelf.voLayersN   = aorLayers
+      aorSelf.viSizeBatch = aiSizeBatch
+      aorSelf.voFlatten   = voNP.empty( aorSelf.viSizeBatch )
 
-   def MForwardPass( aorSelf, adX, aiIndex ) :
-      # Initialize empty list of results
-      kdA = []
+   def MForwardPass( aorSelf, adX, aiI ) :
+      kiCountC = len( aorSelf.voLayersC )
 
-      # Execute first CNN Layer
-      kdA.append( aorSelf.voLayersC[ 0 ].MForwardPass( adX ) )
+      # Initialize empty list of outputs
+      kdPrevOut = [ ]
 
-      # Execute each intermediate CNN Layer
-      for kiI in range( 1, len( aorSelf.voLayersC ) ) :
-         kdA.append( aorSelf.voLayersC[ kiI ].MForwardPass( kdA[ kiI - 1 ] ) )
+      # Forward Pass on each CNN layer
+      for kiI in range( kiCountC ) :
+         # Build the list of outputs from the previous layer
+         if( kiI == 0 ) :
+            kdPrevOut.append( adX )
+         else :
+            kdPrevOut.clear( )
+            for kiJ in range( len( aorSelf.voLayersC[ kiI ].voFM ) ) :
+               kdPrevOut.append( aorSelf.voLayersC[ kiI ].voFM[ kiJ ].vdOutputSS[ aiI ] )
 
-      # Run Forward Pass on first layer
-      kdA = aorSelf.voLayer[ 0 ].MForwardPass( adX )
+         # Forward pass on the CNN Layer
+         aorSelf.voLayersC[ kiI ].MForwardPass( kdPrevOut, aiI )
 
-      # Run Forward Pass on Hidden Layers and Last Layer
-      for kiI in range( 1, len( aorSelf.voLayer ) ) :
-         kdA = aorSelf.voLayer[ kiI ].MForwardPass( kdA )
+      # Flatten each feature map in the CNN Layer and assemble all maps into an nx1 vector
+      kiSizeOut  = len( aorSelf.voLayersC[ kiCountC - 1 ].voFM[ 0 ].vdOutputSS[ aiI ] )   # Get the size of the feature map output
+      kiSizeFlat = kiSizeOut ** 2                                                         # Calculate the size of the flattened vector
+      aorSelf.voFlatten[ aiI ] = voNP.empty( ( kiSizeFlat, 1 ) )                          # Create the flattened vector
+      kiF = 0
+      for kiI in range( len( aorSelf.voLayerC[ kiCountC - 1 ].voFM ) ) :                     # For each feature map in the last layer
+         koOut  = aorSelf.voLayersC[ kiCountC - 1 ].voFM[ kiI ].vdOutputSS[ aiI ]            # Obtain the output of the feature map
+         koFlat = koFM.voOutputSS[ aiI ].reshape( koOut.shape[ 0 ] * koOut.shape[ 1 ], 1 )   # Flatten the output of the feature map
+         for kiR in range( len( koFlat ) ) :                                                 # For each row in the flattened output
+            aorSelf.voFlatten[ aiI ][ kiF ][ 0 ] = koOut[ kiR ][ 0 ]
 
       # Return result
       return( kdA )
@@ -41,9 +55,9 @@ class TcCNNDeep( object ) :
          kdX, kdY = voShuffle( adX, adY, random_state = 0 )
 
          for kiI in range( 0, len( kdX ), aiBatchSize ) :
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            with concurrent.futures.ProcessPoolExecutor() as executor :
                for kiX in range( aiBatchSize ) :
-                  kdA[ kiX ] = aorSelf.MForwardPass( kdXb[ kiI + kiX ] )
+                  kdA[ kiX ] = aorSelf.MForwardPass( kdX[ kiI + kiX ], kiX )
 
 
             # Get the Input and Expected Output Batches

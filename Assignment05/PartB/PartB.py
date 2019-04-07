@@ -31,28 +31,29 @@ def main( ) :
    koMNIST = '../../MNIST/'
 
    # Settings for Deep Convolutional Neural Network (Accuracy should be ~92%)
-   kiBatchSize = 5
+   kiSizeBatch = 5
+   kiSizeKernl = 5   # Size of the kernel
    kiCountFML1 = 6   # Feature Maps in first layer
    kiCountFML2 = 12  # Feature Maps in second layer
 
    # Create a list of CNN Layers
    koCNNLayers = [ ]
-   koCNNLayers.append( TcLayerC( ( kiCountFML1, 1 ), ( 28, 5, kiBatchSize ), TePool.XeAvg, TeActivation.XeRELU ) )
-   koCNNLayers.append( TcLayerC( ( kiCountFML2, kiCountFML1 ), ( 12, 5, kiBatchSize ), TePool.XeAvg, TeActivation.XeRELU ) )
+   koCNNLayers.append( TcLayerC( ( kiCountFML1, 1 ), ( 28, kiSizeKernl, kiSizeBatch ), TePool.XeAvg, TeActivation.XeRELU ) )
+   koCNNLayers.append( TcLayerC( ( kiCountFML2, kiCountFML1 ), ( 12, kiSizeKernl, kiSizeBatch ), TePool.XeAvg, TeActivation.XeRELU ) )
 
    # Create a list of NN Layers. The second CNN layer produces an output of 4x4 per Feature Map
    koNNLayers = [ ]
-   koNNLayers.append( TcLayer( ( 50, 4 * 4 * kiCountFML2 ), TeActivation.XeRELU, False, 0.8, 0.8, kiBatchSize ) )
-   koNNLayers.append( TcLayer( ( 10, 50 ), TeActivation.XeSoftMax, False, 0.8, 0.8, kiBatchSize ) )
+   koNNLayers.append( TcLayer( ( 50, 4 * 4 * kiCountFML2, kiSizeBatch ), TeActivation.XeRELU, False, 0.8, 0.8 ) )
+   koNNLayers.append( TcLayer( ( 10, 50, kiSizeBatch ), TeActivation.XeSoftMax, False, 0.8, 0.8 ) )
 
    # Read MNist Training Data Set
    kdTrainX, kdTrainY = MReadMNIST( koMNIST + 'Training1000/' )
 
    # Create Deep CNN
-   koCNN = TcCNNDeep( koCNNLayers, koNNLayers )
+   koCNN = TcCNNDeep( koCNNLayers, koNNLayers, kiSizeBatch )
 
    # Train the CNN
-   koCNN.MTrain( kdTrainX, kdTrainY, 30, 0.1, kiBatchSize )
+   koCNN.MTrain( kdTrainX, kdTrainY, 30, 0.1, kiSizeBatch )
 
 if __name__ == "__main__" :
     main( )
