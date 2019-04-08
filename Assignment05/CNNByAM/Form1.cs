@@ -61,7 +61,7 @@ namespace CNNByAM
 
         double ComputeAccuracy(bool deepCNN)
         {
-            String testDir = "D:\\csharp2016\\DeepLearning\\MNIST\\data\\TestAll10000\\";
+            String testDir = @"..\..\..\..\MNIST\TestAll10000\";
             //string testDir = @"D:\csharp2018\DataSets\MNIST\MNISTBMP\data\TestAll10000";
             DirectoryInfo dinfo = new DirectoryInfo(testDir);
             int accuracyCount = 0;
@@ -93,7 +93,7 @@ namespace CNNByAM
         }
         Tuple<List<Matrix>, List<Matrix>> ReadMNISTTrainingData()
         {
-            String trainDir = "D:\\DeepLearning\\mnistdata\\data\\Training1000\\";
+            String trainDir = @"..\..\..\..\MNIST\Training1000\";
             //string trainDir = @"D:\csharp2018\DataSets\MNIST\MNISTBMP\Training1000";
             //string trainDir = @"D:\csharp2016\DeepLearning\MNIST\data\TrainingAll60000";
             //string trainDir = @"D:\csharp2018\DataSets\MNIST\MNISTBMP\data\TrainingAll60000";
@@ -160,7 +160,7 @@ namespace CNNByAM
             try
             {
                 OpenFileDialog ofd = new OpenFileDialog();
-                ofd.InitialDirectory = "D:\\csharp2016\\DeepLearning\\MNIST\\data\test";
+                ofd.InitialDirectory = @"..\..\..\MNIST\test";
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
                     picTest.Image = new Bitmap(ofd.FileName);

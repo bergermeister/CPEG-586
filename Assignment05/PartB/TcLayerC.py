@@ -40,19 +40,14 @@ class TcLayerC( object ) :
             # Perform convolution with output of feature map from previous layer with feature in this layer
             aorSelf.vdConvResults[ aiI ][ kiP ][ kiQ ] = adX[ kiP ].convolve( aorSelf.voKernels[ kiP ][ kiQ ] )
       
-      // add convolution results
-      for (int q = 0; q < FeatureMapList.Count; q++)
-      //Parallel.For(0, FeatureMapList.Count, (q) => 
-      {
-            ConvolSums[batchIndex,q].Clear();
-            for (int p = 0; p < PrevLayerOutputList.Count; p++)
-            {
-               ConvolSums[batchIndex,q] = ConvolSums[batchIndex,q] + ConvolResults[batchIndex,p, q];
-            }
-      }
-      // evaluate each feature map i.e., perform activation after adding bias
-      for(int i = 0; i < FeatureMapList.Count;i++)
-      {
-            FeatureMapList[i].Evaluate(ConvolSums[batchIndex,i],batchIndex);
-      }
+      for kiQ in range( aorSelf.viNumFMThis ) :
+         aorSelf.vdConvolSums[ aiI ][ kiQ ] = 0.0
+         for kiP in range( aorSelf.viNumFMPrev ) :
+            # Add convolution results
+            aorSelf.vdConvolSums[ aiI ][ kiQ ] += aorSelf.vdConvolResults[ aiI ][ kiP ][ kiQ ]
+      
+      # Evaluate each feature map
+      for kiI in range( aorSelf.viNumFMThis ) :
+         aorSelf.voFM[ kiI ].MForwardPass( aorSelf.vdConvolSums[ aiI ][ kiI ], aiI )
+      
             

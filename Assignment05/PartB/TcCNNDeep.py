@@ -32,7 +32,7 @@ class TcCNNDeep( object ) :
 
       # Flatten each feature map in the CNN Layer and assemble all maps into an nx1 vector
       kiSizeOut  = len( aorSelf.voLayersC[ kiCountC - 1 ].voFM[ 0 ].vdOutputSS[ aiI ] )   # Get the size of the feature map output
-      kiSizeFlat = kiSizeOut ** 2                                                         # Calculate the size of the flattened vector
+      kiSizeFlat = ( kiSizeOut ** 2 ) * len( aorSelf.voLayersC[ kiCountC - 1 ].voFM )     # Calculate the size of the flattened vector
       aorSelf.voFlatten[ aiI ] = voNP.empty( ( kiSizeFlat, 1 ) )                          # Create the flattened vector
       kiF = 0
       for kiI in range( len( aorSelf.voLayerC[ kiCountC - 1 ].voFM ) ) :                     # For each feature map in the last layer
@@ -40,12 +40,19 @@ class TcCNNDeep( object ) :
          koFlat = koFM.voOutputSS[ aiI ].reshape( koOut.shape[ 0 ] * koOut.shape[ 1 ], 1 )   # Flatten the output of the feature map
          for kiR in range( len( koFlat ) ) :                                                 # For each row in the flattened output
             aorSelf.voFlatten[ aiI ][ kiF ][ 0 ] = koOut[ kiR ][ 0 ]
+            kiF += 1
+
+      for kiI in range( len( aorSelf.voLayerN ) ) :
+         if( kiI == 0 ) :
+            kdRes = aorSelf.voLayersN[ kiI ].MForwardPass( aorSelf.voFlatten[ aiI ], aiI )
+         else :
+            kdRes = aorSelf.voLayersN[ kiI ].MForwardPass( kdRes, aiI )
 
       # Return result
       return( kdA )
 
    def MTrain( aorSelf, adX, adY, aiEpochs, adLR, aiBatchSize ) :
-      kdA = voNP.zeros( ( aiBatchSize, 1 ) )
+      kdL = voNP.array( ( aiBatchSize, 1 ) )
 
       for kiEpoch in range( aiEpochs ) :
          # Zero out the loss
@@ -57,9 +64,10 @@ class TcCNNDeep( object ) :
          for kiI in range( 0, len( kdX ), aiBatchSize ) :
             with concurrent.futures.ProcessPoolExecutor() as executor :
                for kiX in range( aiBatchSize ) :
-                  kdA[ kiX ] = aorSelf.MForwardPass( kdX[ kiI + kiX ], kiX )
+                  kdA = aorSelf.MForwardPass( kdX[ kiI + kiX ], kiX )
 
-
+                  for kiR in range( len( kdA ) ) :
+                     kdL[ kiR ] +=
             # Get the Input and Expected Output Batches
             # kdXb = kdX[ kiI : ( kiI + aiBatchSize ) ]
             # kdYb = kdY[ kiI : ( kiI + aiBatchSize ) ]
