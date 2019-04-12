@@ -67,13 +67,4 @@ class TcCNNDeep( object ) :
                   kdA = aorSelf.MForwardPass( kdX[ kiI + kiX ], kiX )
 
                   for kiR in range( len( kdA ) ) :
-                     kdL[ kiR ] +=
-            # Get the Input and Expected Output Batches
-            # kdXb = kdX[ kiI : ( kiI + aiBatchSize ) ]
-            # kdYb = kdY[ kiI : ( kiI + aiBatchSize ) ]
-
-            # Execute a Foward Pass
-            # kdA = aorSelf.MForwardPass( kdXb )
-
-            # Calculate the Loss
-            # kdLoss += aorSelf.MLoss( kdA, kdYb )
+                     kdL[ kiR ] += ( kdA[ kiR ][ 0 ] - adY[ kiI + kiX ][ kiR ][ 0 ] ) ** 2

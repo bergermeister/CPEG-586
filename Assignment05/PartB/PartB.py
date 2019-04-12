@@ -9,6 +9,7 @@ from TeActivation import TeActivation
 from TcLayer import TcLayer
 from TcLayerC import TcLayerC
 from TcCNNDeep import TcCNNDeep
+from TcMatrix import TcMatrix
 
 def MReadMNIST( aoPath ) :
    # Create empty of images and expected output

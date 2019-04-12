@@ -1,4 +1,5 @@
 import numpy as voNP
+from scipy import ndimage
 from TePool import TePool
 from TeActivation import TeActivation
 from TcFeatureMap import TcFeatureMap
@@ -22,8 +23,8 @@ class TcLayerC( object ) :
          aorSelf.voFM.append( TcFeatureMap( aorSelf.viConvOutputSize, aePool, aeActivation, aorSelf.viSizeBatch ) )
 
       # Initialize Convolution Results and Sums matrices
-      aorSelf.vdConvResults = voNP.array( ( aorSelf.viSizeBatch, aorSelf.viNumFMPrev, aorSelf.viNumFMThis ) )
-      aorSelf.vdConvolSums = voNP.array( ( aorSelf.viSizeBatch, aorSelf.viNumFMThis ) )
+      aorSelf.vdConvResults = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viNumFMPrev, aorSelf.viNumFMThis, 28, 28 ) )
+      aorSelf.vdConvolSums = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viNumFMThis ) )
       for kiB in range( aorSelf.viSizeBatch ) :
          for kiF in range( aorSelf.viNumFMThis ) :
             aorSelf.vdConvolSums = voNP.zeros( ( aorSelf.viConvOutputSize, aorSelf.viConvOutputSize ) )
@@ -38,7 +39,9 @@ class TcLayerC( object ) :
       for kiP in range( aorSelf.viNumFMPrev ) :                # For each feature map from the previous layer
          for kiQ in range( aorSelf.viNumFMThis ) :             # For each feature map in this layer
             # Perform convolution with output of feature map from previous layer with feature in this layer
-            aorSelf.vdConvResults[ aiI ][ kiP ][ kiQ ] = adX[ kiP ].convolve( aorSelf.voKernels[ kiP ][ kiQ ] )
+            koCV = ndimage.convolve( adX[ kiP ], aorSelf.voKernels[ kiP ][ kiQ ].rot90() )
+            kdCV = voNP.convolve( aorSelf.voKernels[ kiP ][ kiQ ], adX[ kiP ] )
+            aorSelf.vdConvResults[ aiI ][ kiP ][ kiQ ] = voNP.convolve( adX[ kiP ], aorSelf.voKernels[ kiP ][ kiQ ] )
       
       for kiQ in range( aorSelf.viNumFMThis ) :
          aorSelf.vdConvolSums[ aiI ][ kiQ ] = 0.0
