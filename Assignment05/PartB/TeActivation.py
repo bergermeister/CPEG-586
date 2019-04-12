@@ -15,6 +15,6 @@ class TeActivation( object ) :
    def MRELU( adActual ) :
       return( voNP.maximum( 0, adActual ) )
 
-   def MSoftMax( aorSelf, adActual ) :
+   def MSoftMax( adActual ) :
       kdE = voNP.exp( adActual )
       return( kdE / kdE.sum( ) )

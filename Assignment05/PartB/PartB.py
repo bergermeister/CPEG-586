@@ -44,8 +44,8 @@ def main( ) :
 
    # Create a list of NN Layers. The second CNN layer produces an output of 4x4 per Feature Map
    koNNLayers = [ ]
-   koNNLayers.append( TcLayer( ( 50, 4 * 4 * kiCountFML2, kiSizeBatch ), TeActivation.XeRELU, False, 0.8, 0.8 ) )
-   koNNLayers.append( TcLayer( ( 10, 50, kiSizeBatch ), TeActivation.XeSoftMax, False, 0.8, 0.8 ) )
+   koNNLayers.append( TcLayer( ( 50, 4 * 4 * kiCountFML2, kiSizeBatch ), TeActivation.XeRELU, 0.8, 0.8 ) )
+   koNNLayers.append( TcLayer( ( 10, 50, kiSizeBatch ), TeActivation.XeSoftMax, 0.8, 0.8 ) )
 
    # Read MNist Training Data Set
    kdTrainX, kdTrainY = MReadMNIST( koMNIST + 'Training1000/' )

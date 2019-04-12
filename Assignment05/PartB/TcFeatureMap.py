@@ -1,6 +1,7 @@
 import numpy as voNP
 from TePool import TePool
 from TeActivation import TeActivation
+from TcMatrix import TcMatrix
 
 # Convolutional Neural Network Feature Map
 class TcFeatureMap( object ) :
@@ -9,36 +10,49 @@ class TcFeatureMap( object ) :
       aorSelf.viBatchSize = aiBatchSize
       aorSelf.vePool      = aePool
       aorSelf.veAct       = aeActivation
-      aorSelf.vdDeltaSS = voNP.array( ( aiBatchSize, 1 ) )
-      aorSelf.vdDeltaCV = voNP.array( ( aiBatchSize, 1 ) )
-      aorSelf.vdOutputSS = voNP.array( ( aiBatchSize, 1 ) )
-      aorSelf.vdActCV = voNP.array( ( aiBatchSize, 1 ) )
-      aorSelf.vdAPrime = voNP.array( ( aiBatchSize, 1 ) )
-      aorSelf.vdSum = voNP.array( ( aiBatchSize, 1 ) )
-      aorSelf.vdBias = voNP.random.uniform( low=-0.1, high=0.1 )
+      aorSelf.voDeltaSS  = voNP.ndarray( ( aiBatchSize, 1 ), dtype=TcMatrix )
+      aorSelf.voDeltaCV  = voNP.ndarray( ( aiBatchSize, 1 ), dtype=TcMatrix )
+      aorSelf.voOutputSS = voNP.ndarray( ( aiBatchSize, 1 ), dtype=TcMatrix )
+      aorSelf.voActCV    = voNP.ndarray( ( aiBatchSize, 1 ), dtype=TcMatrix )
+      aorSelf.voAPrime   = voNP.ndarray( ( aiBatchSize, 1 ), dtype=TcMatrix )
+      aorSelf.voSum      = voNP.ndarray( ( aiBatchSize, 1 ), dtype=TcMatrix )
+      aorSelf.vdBias     = voNP.random.uniform( low=-0.1, high=0.1 )
 
+   def MForwardPass( aorSelf, adX, aiB ) :
+      # Copy the input to the sum
+      koSum = TcMatrix( adX.viRows, adX.viCols )
+      koSum.vdData = adX.vdData.copy( )
+      
+      # Add the bias to the sum
+      for kiR in range( koSum.vdData.shape[ 0 ] ) :
+         for kiC in range( koSum.vdData.shape[ 1 ] ) :
+            koSum.vdData[ kiR ][ kiC ] += aorSelf.vdBias
+      
+      # Save the sum at the batch index
+      aorSelf.voSum[ aiB ][ 0 ] = koSum
 
-   def MForwardPass( aorSelf, adX, aiI ) :
-      # Add the bias to the input
-      aorSelf.vdSum[ aiI ] = adX + aorSelf.vdBias
+      # Create matrices for the activation function and delta
+      aorSelf.voActCV[ aiB ][ 0 ] = TcMatrix( koSum.viRows, koSum.viCols )
+      aorSelf.voAPrime[ aiB ][ 0 ] = TcMatrix( koSum.viRows, koSum.viCols )
 
       # Apply Activation function
       if( aorSelf.veAct == TeActivation.XeSigmoid ) :
-         aorSelf.vdActCV[ aiI ] = TeActivation.MSigmoid( aorSelf.vdSum[ aiI ] )
-         aorSelf.vdAPrime[ aiI ] = 1 - ( vdActCV[ aiI ] * vdActCV[ aiI ] )
+         aorSelf.voActCV[ aiB ][ 0 ].vdData = TeActivation.MSigmoid( aorSelf.voSum[ aiB ][ 0 ].vdData )
+         aorSelf.voAPrime[ aiB ][ 0 ].vdData = 1 - ( vdActCV[ aiB ][ 0 ].vdData ** 2 )
       elif( aorSelf.veAct == TeActivation.XeRELU ) :
          # No APrime for RELU, delta is made zero for negative sums
-         aorSelf.vdActCV[ aiI ] = TeActivation.MRELU( aorSelf.vdSum[ aiI ] )
+         aorSelf.voActCV[ aiB ][ 0 ].vdData = TeActivation.MRELU( aorSelf.voSum[ aiB ][ 0 ].vdData )
+         aorSelf.voAPrime[ aiB ][ 0 ] = None
 
       # Apply pooling
       if( aorSelf.vePool == TePool.XeAvg ) :
-         kdRes = TePool.MAverage( aorSelf.vdActCV[ aiI ] )
+         koRes = TePool.MAverage( aorSelf.voActCV[ aiB ][ 0 ] )
       elif( aorSelf.vePool == TePool.XeMax ) :
-         kdRes = TePool.MMax( aorSelf.vdActCV[ aiI ] )
+         koRes = TePool.MMax( aorSelf.voActCV[ aiB ][ 0 ] )
       else :
-         kdRes = aorSelf.vdActCV[ aiI ]
+         koRes = aorSelf.voActCV[ aiB ][ 0 ]
 
       # Record the result
-      aorSelf.vdOutputSS[ aiI ] = kdRes
+      aorSelf.voOutputSS[ aiB ] = koRes
 
-      return( kdRes )
+      return( koRes )

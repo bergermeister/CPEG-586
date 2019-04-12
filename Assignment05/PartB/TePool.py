@@ -1,4 +1,5 @@
 import numpy as voNP
+from TcMatrix import TcMatrix
 
 class TePool( object ) :
    XeNone = 0
@@ -6,19 +7,19 @@ class TePool( object ) :
    XeAvg  = 2
 
    def MAverage( adX ) :
-      kdRes = voNP.zeros( ( adX.shape[ 0 ] / 2, adX.shape[ 1 ] / 2 ) )
-      for kiR in range( adX.shape[ 0 ] / 2 ) :
-         for kiC in range( adX.shape[ 1 ] / 2 ) :
-            kdRes[ kiR ][ kiC ] = ( adX[ ( kiR * 2 ) + 0 ][ ( kiC * 2 ) + 0 ] + 
-                                    adX[ ( kiR * 2 ) + 0 ][ ( kiC * 2 ) + 1 ] + 
-                                    adX[ ( kiR * 2 ) + 1 ][ ( kiC * 2 ) + 0 ] + 
-                                    adX[ ( kiR * 2 ) + 1 ][ ( kIC * 2 ) + 1 ] ) / 4.0;
-      return( kdRes )
+      koRes = TcMatrix( adX.viRows / 2, adX.viCols / 2 )
+      for kiR in range( koRes.viRows ) :
+         for kiC in range( koRes.viCols ) :
+            koRes.vdData[ kiR ][ kiC ] = ( adX.vdData[ ( kiR * 2 ) + 0 ][ ( kiC * 2 ) + 0 ] + 
+                                           adX.vdData[ ( kiR * 2 ) + 0 ][ ( kiC * 2 ) + 1 ] + 
+                                           adX.vdData[ ( kiR * 2 ) + 1 ][ ( kiC * 2 ) + 0 ] + 
+                                           adX.vdData[ ( kiR * 2 ) + 1 ][ ( kiC * 2 ) + 1 ] ) / 4.0;
+      return( koRes )
 
    def MMax( adX ) :
-      kdRes = voNP.zeros( ( adX.shape[ 0 ] / 2, adX.shape[ 1 ] / 2 ) )
-      kdMax = voNP.max( adX )
-      for kiR in range( adX.shape[ 0 ] / 2 ) :
-         for kiC in range( adX.shape[ 1 ] / 2 ) :
-            kdRes[ kiR ][ kiC ] = kdMax
-      return( kdRes )
+      koRes = TcMatrix( adX.viRows / 2, adX.viCols / 2 )
+      kdMax = voNP.max( adX.vdData )
+      for kiR in range( koRes.viRows ) :
+         for kiC in range( koRes.kiCols ) :
+            koRes.vdData[ kiR ][ kiC ] = kdMax
+      return( koRes )

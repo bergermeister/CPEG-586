@@ -3,6 +3,7 @@ from scipy import ndimage
 from TePool import TePool
 from TeActivation import TeActivation
 from TcFeatureMap import TcFeatureMap
+from TcMatrix import TcMatrix
 
 # Convolutional Neural Network Layer
 class TcLayerC( object ) :
@@ -23,34 +24,42 @@ class TcLayerC( object ) :
          aorSelf.voFM.append( TcFeatureMap( aorSelf.viConvOutputSize, aePool, aeActivation, aorSelf.viSizeBatch ) )
 
       # Initialize Convolution Results and Sums matrices
-      aorSelf.vdConvResults = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viNumFMPrev, aorSelf.viNumFMThis, 28, 28 ) )
-      aorSelf.vdConvolSums = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viNumFMThis ) )
+      aorSelf.vdConvResults = voNP.ndarray( shape=( aorSelf.viSizeBatch, aorSelf.viNumFMPrev, aorSelf.viNumFMThis ), dtype=TcMatrix )
+      aorSelf.vdConvolSums  = voNP.ndarray( shape=( aorSelf.viSizeBatch, aorSelf.viNumFMThis ), dtype=TcMatrix )
       for kiB in range( aorSelf.viSizeBatch ) :
          for kiF in range( aorSelf.viNumFMThis ) :
-            aorSelf.vdConvolSums = voNP.zeros( ( aorSelf.viConvOutputSize, aorSelf.viConvOutputSize ) )
+            koSum = TcMatrix( aorSelf.viConvOutputSize, aorSelf.viConvOutputSize )
+            koSum.vdData = voNP.zeros( ( koSum.viRows, koSum.viCols ) )
+            aorSelf.vdConvolSums[ kiB ][ kiF ] = koSum
 
-      
-      aorSelf.voKernelsG = voNP.zeros( ( aorSelf.viNumFMPrev, aorSelf.viNumFMThis, aorSelf.viSizeKernl, aorSelf.viSizeKernl ) )
-      aorSelf.voKernels = voNP.random.uniform( low=-0.1, high=0.1,
-                                              size=( aorSelf.viNumFMPrev, aorSelf.viNumFMThis, 
-                                                     aorSelf.viSizeKernl, aorSelf.viSizeKernl ) )
+      # Initialize Convolution Kernels
+      aorSelf.voKernels  = voNP.ndarray( shape=( aorSelf.viNumFMPrev, aorSelf.viNumFMThis ), dtype=TcMatrix )
+      aorSelf.voKernelsG = voNP.ndarray( shape=( aorSelf.viNumFMPrev, aorSelf.viNumFMThis ), dtype=TcMatrix )
+      for kiP in range( aorSelf.viNumFMPrev ) :       # For each feature map in previous layer
+         for kiT in range( aorSelf.viNumFMThis ) :    # For each feature map in this layer
+            koKernel  = TcMatrix( aorSelf.viSizeKernl, aorSelf.viSizeKernl )
+            koKernelG = TcMatrix( aorSelf.viSizeKernl, aorSelf.viSizeKernl )
+            koKernel.vdData = voNP.random.uniform( low=-0.1, high=0.1, size=( koKernel.viRows, koKernel.viCols ) )
+            koKernelG.vdData = voNP.zeros( ( koKernelG.viRows, koKernelG.viCols ) )
+            aorSelf.voKernels[ kiP ][ kiT ]  = koKernel
+            aorSelf.voKernelsG[ kiP ][ kiT ] = koKernelG
 
-   def MForwardPass( aorSelf, adX, aiI ) :
+   def MForwardPass( aorSelf, aoX, aiB ) :
       for kiP in range( aorSelf.viNumFMPrev ) :                # For each feature map from the previous layer
          for kiQ in range( aorSelf.viNumFMThis ) :             # For each feature map in this layer
             # Perform convolution with output of feature map from previous layer with feature in this layer
-            koCV = ndimage.convolve( adX[ kiP ], aorSelf.voKernels[ kiP ][ kiQ ].rot90() )
-            kdCV = voNP.convolve( aorSelf.voKernels[ kiP ][ kiQ ], adX[ kiP ] )
-            aorSelf.vdConvResults[ aiI ][ kiP ][ kiQ ] = voNP.convolve( adX[ kiP ], aorSelf.voKernels[ kiP ][ kiQ ] )
+            aorSelf.vdConvResults[ aiB ][ kiP ][ kiQ ] = aoX[ kiP ].MConvolve( aorSelf.voKernels[ kiP ][ kiQ ] )            
       
       for kiQ in range( aorSelf.viNumFMThis ) :
-         aorSelf.vdConvolSums[ aiI ][ kiQ ] = 0.0
-         for kiP in range( aorSelf.viNumFMPrev ) :
+         koSum = TcMatrix( aorSelf.vdConvResults[ aiB ][ 0 ][ 0 ].viRows, aorSelf.vdConvResults[ 0 ][ 0 ][ 0 ].viCols )
+         koSum.vdData = voNP.zeros( ( koSum.viRows, koSum.viCols ) )
+         for kiP in range( len( aoX ) ) :
             # Add convolution results
-            aorSelf.vdConvolSums[ aiI ][ kiQ ] += aorSelf.vdConvolResults[ aiI ][ kiP ][ kiQ ]
+            koSum.vdData += aorSelf.vdConvResults[ aiB ][ kiP ][ kiQ ].vdData
+         aorSelf.vdConvolSums[ aiB ][ kiQ ] = koSum
       
       # Evaluate each feature map
       for kiI in range( aorSelf.viNumFMThis ) :
-         aorSelf.voFM[ kiI ].MForwardPass( aorSelf.vdConvolSums[ aiI ][ kiI ], aiI )
+         aorSelf.voFM[ kiI ].MForwardPass( aorSelf.vdConvolSums[ aiB ][ kiI ], aiB )
       
             

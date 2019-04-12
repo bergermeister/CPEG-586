@@ -2,9 +2,9 @@ import numpy as voNP
 
 class TcMatrix( object ) :
    def __init__( aorSelf, aiRows, aiCols ) :
-      aorSelf.viRows = aiRows
-      aorSelf.viCols = aiCols
-      aorSelf.vdData = voNP.zeros( ( aiRows, aiCols ) )
+      aorSelf.viRows = int( aiRows )
+      aorSelf.viCols = int( aiCols )
+      aorSelf.vdData = voNP.zeros( ( aorSelf.viRows, aorSelf.viCols ) )
 
    def MRandomize( aorSelf, aiMin, aiMax ) :
       aorSelf.vdData = voNP.random.uniform( low=aiMin, high=aiMax, 
