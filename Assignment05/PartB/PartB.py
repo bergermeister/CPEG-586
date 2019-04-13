@@ -58,8 +58,8 @@ def main( ) :
    # Settings for Deep Convolutional Neural Network (Accuracy should be ~92%)
    kiSizeBatch = 5
    kiSizeKernl = 5   # Size of the kernel
-   kiCountFML1 = 6   # Feature Maps in first layer
-   kiCountFML2 = 12  # Feature Maps in second layer
+   kiCountFML1 = 2 #6   # Feature Maps in first layer
+   kiCountFML2 = 4 #12  # Feature Maps in second layer
 
    # Create a list of CNN Layers
    koCNNLayers = [ ]

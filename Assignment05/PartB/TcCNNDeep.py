@@ -1,6 +1,8 @@
 import concurrent.futures
 import numpy as voNP
 from sklearn.utils import shuffle as voShuffle
+from multiprocessing import Process
+import multiprocessing
 from TcMatrix import TcMatrix
 from TeActivation import TeActivation
 
@@ -12,6 +14,7 @@ class TcCNNDeep( object ) :
       aorSelf.voLayersN   = aorLayers
       aorSelf.viSizeBatch = aiSizeBatch
       aorSelf.voFlatten   = voNP.ndarray( shape=( aorSelf.viSizeBatch ), dtype=TcMatrix )
+      aorSelf.vdError     = 0.0
 
    def MForwardPass( aorSelf, adX, aiB ) :
       kiCountC = len( aorSelf.voLayersC )
@@ -54,28 +57,40 @@ class TcCNNDeep( object ) :
       return( kdRes )
 
    def MTrain( aorSelf, adX, adY, aiEpochs, adLR, aiBatchSize ) :
+      koProc = voNP.ndarray( aiBatchSize, dtype=Process )
+
       for kiEpoch in range( aiEpochs ) :
          # Total Error
-         kdError = 0.0
+         aorSelf.vdError = 0.0
 
          # Shuffle the input/output pairs
          kdX, kdY = voShuffle( adX, adY, random_state = 0 )
 
          for kiI in range( 0, len( kdX ), aiBatchSize ) :
-            with concurrent.futures.ProcessPoolExecutor() as executor :
-               for kiB in range( aiBatchSize ) :
-                  kiJ = kiI + kiB
-                  koX = TcMatrix( kdX[ kiJ ].shape[ 0 ], kdX[ kiJ ].shape[ 1 ] )
-                  koX.vdData = kdX[ kiJ ]
-                  kdA = aorSelf.MForwardPass( koX, kiB )
+            
+            for kiB in range( aiBatchSize ) :
+               kiJ = kiI + kiB
+               #aorSelf.MLoop( kdX[ kiJ ], kdY[ kiJ ], kiB )
+               koProc[ kiB ] = Process( target=aorSelf.MLoop, args=( kdX[ kiJ ], kdY[ kiJ ], kiB ) )
+               koProc[ kiB ].start( )
+            
+            for kiB in range( aiBatchSize ) :
+               koProc[ kiB ].join( )
 
-                  # Calculate the loss
-                  kdL = ( kdA - kdY[ kiJ ] ) ** 2
-                  
-                  # Accumulate Error
-                  kdError += kdL
-
-                  aorSelf.MBackPropagate( koX, kdY[ kiJ ], kiB )
+            # with concurrent.futures.ProcessPoolExecutor() as executor :
+            #    for kiB in range( aiBatchSize ) :
+            #       kiJ = kiI + kiB
+            #       koX = TcMatrix( kdX[ kiJ ].shape[ 0 ], kdX[ kiJ ].shape[ 1 ] )
+            #       koX.vdData = kdX[ kiJ ]
+            #       kdA = aorSelf.MForwardPass( koX, kiB )
+            # 
+            #       # Calculate the loss
+            #       kdL = ( ( kdA - kdY[ kiJ ] ) ** 2 )
+            #       
+            #       # Accumulate Error
+            #       kdError += kdL.sum( )
+            # 
+            #       aorSelf.MBackPropagate( koX, kdY[ kiJ ], kiB )
 
             # Update Kernel Weights and Biases
             aorSelf.MUpdateWeightsBiases( adLR, aiBatchSize )
@@ -83,7 +98,20 @@ class TcCNNDeep( object ) :
             # Clear gradients
             aorSelf.MClearGradients( aiBatchSize )
 
-         print( "Epoch: ", kiEpoch, " Error: ", kdError )
+         print( "Epoch: ", kiEpoch, " Error: ",  aorSelf.vdError )
+
+   def MLoop( aorSelf, adX, adY, aiB ) :
+      koX = TcMatrix( adX.shape[ 0 ], adX.shape[ 1 ] )
+      koX.vdData = adX
+      kdA = aorSelf.MForwardPass( koX, aiB )
+
+      # Calculate the loss
+      kdL = ( ( kdA - adY ) ** 2 )
+                  
+      # Accumulate Error
+      aorSelf.vdError += kdL.sum( )
+
+      aorSelf.MBackPropagate( koX, adY, aiB )
 
    def MBackPropagate( aorSelf, aoX, aiY, aiB ) :
       kiCountLn = len( aorSelf.voLayersN )   # Number of NN Layers

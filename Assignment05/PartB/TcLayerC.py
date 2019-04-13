@@ -51,7 +51,7 @@ class TcLayerC( object ) :
             aorSelf.vdConvResults[ aiB ][ kiP ][ kiQ ] = aoX[ kiP ].MConvolve( aorSelf.voKernels[ kiP ][ kiQ ] )            
       
       for kiQ in range( aorSelf.viNumFMThis ) :
-         koSum = TcMatrix( aorSelf.vdConvResults[ aiB ][ 0 ][ 0 ].viRows, aorSelf.vdConvResults[ 0 ][ 0 ][ 0 ].viCols )
+         koSum = TcMatrix( aorSelf.vdConvResults[ aiB ][ 0 ][ 0 ].viRows, aorSelf.vdConvResults[ aiB ][ 0 ][ 0 ].viCols )
          koSum.vdData = voNP.zeros( ( koSum.viRows, koSum.viCols ) )
          for kiP in range( len( aoX ) ) :
             # Add convolution results
