@@ -11,7 +11,7 @@ class TcCNNDeep( object ) :
       aorSelf.voLayersC   = aorLayersC
       aorSelf.voLayersN   = aorLayers
       aorSelf.viSizeBatch = aiSizeBatch
-      aorSelf.voFlatten   = voNP.ndarray( shape=( aorSelf.viSizeBatch, 1 ), dtype=TcMatrix )
+      aorSelf.voFlatten   = voNP.ndarray( shape=( aorSelf.viSizeBatch ), dtype=TcMatrix )
 
    def MForwardPass( aorSelf, adX, aiB ) :
       kiCountC = len( aorSelf.voLayersC )
@@ -27,26 +27,26 @@ class TcCNNDeep( object ) :
          else :
             kdPrevOut.clear( )
             for kiJ in range( len( aorSelf.voLayersC[ kiI - 1 ].voFM ) ) :
-               kdPrevOut.append( aorSelf.voLayersC[ kiI - 1 ].voFM[ kiJ ].voOutputSS[ aiB ][ 0 ] )
+               kdPrevOut.append( aorSelf.voLayersC[ kiI - 1 ].voFM[ kiJ ].voOutputSS[ aiB ] )
 
          # Forward pass on the CNN Layer
          aorSelf.voLayersC[ kiI ].MForwardPass( kdPrevOut, aiB )
 
       # Flatten each feature map in the CNN Layer and assemble all maps into an nx1 vector
-      kiSizeOut  = aorSelf.voLayersC[ kiCountC - 1 ].voFM[ 0 ].voOutputSS[ aiB ][ 0 ].viRows   # Get the size of the feature map output
+      kiSizeOut  = aorSelf.voLayersC[ kiCountC - 1 ].voFM[ 0 ].voOutputSS[ aiB ].viRows   # Get the size of the feature map output
       kiSizeFlat = ( kiSizeOut ** 2 ) * len( aorSelf.voLayersC[ kiCountC - 1 ].voFM )          # Calculate the size of the flattened vector
-      aorSelf.voFlatten[ aiB ][ 0 ] = TcMatrix( kiSizeFlat, 1 )                                # Create the flattened vector
+      aorSelf.voFlatten[ aiB ] = TcMatrix( kiSizeFlat, 1 )                                # Create the flattened vector
       kiF = 0
       for kiI in range( len( aorSelf.voLayersC[ kiCountC - 1 ].voFM ) ) :              # For each feature map in the last layer
-         koOut  = aorSelf.voLayersC[ kiCountC - 1 ].voFM[ kiI ].voOutputSS[ aiB ][ 0 ] # Obtain the output of the feature map
+         koOut  = aorSelf.voLayersC[ kiCountC - 1 ].voFM[ kiI ].voOutputSS[ aiB ] # Obtain the output of the feature map
          kdFlat = koOut.vdData.flatten( )                                              # Flatten the output of the feature map
          for kiR in range( len( kdFlat ) ) :                                           # For each row in the flattened output
-            aorSelf.voFlatten[ aiB ][ 0 ].vdData[ kiF ][ 0 ] = kdFlat[ kiR ]
+            aorSelf.voFlatten[ aiB ].vdData[ kiF ] = kdFlat[ kiR ]
             kiF += 1
 
       for kiI in range( len( aorSelf.voLayersN ) ) :
          if( kiI == 0 ) :
-            kdRes = aorSelf.voLayersN[ kiI ].MForwardPass( aorSelf.voFlatten[ aiB ][ 0 ].vdData, aiB, False )
+            kdRes = aorSelf.voLayersN[ kiI ].MForwardPass( aorSelf.voFlatten[ aiB ].vdData, aiB, False )
          else :
             kdRes = aorSelf.voLayersN[ kiI ].MForwardPass( kdRes, aiB, False )
 
@@ -55,6 +55,9 @@ class TcCNNDeep( object ) :
 
    def MTrain( aorSelf, adX, adY, aiEpochs, adLR, aiBatchSize ) :
       for kiEpoch in range( aiEpochs ) :
+         # Total Error
+         kdError = 0.0
+
          # Shuffle the input/output pairs
          kdX, kdY = voShuffle( adX, adY, random_state = 0 )
 
@@ -68,10 +71,21 @@ class TcCNNDeep( object ) :
 
                   # Calculate the loss
                   kdL = ( kdA - kdY[ kiJ ] ) ** 2
+                  
+                  # Accumulate Error
+                  kdError += kdL
 
-                  aorSelf.MBackPropagate( kdY[ kiJ ], kiB )
+                  aorSelf.MBackPropagate( koX, kdY[ kiJ ], kiB )
 
-   def MBackPropagate( aorSelf, aiY, aiB ) :
+            # Update Kernel Weights and Biases
+            aorSelf.MUpdateWeightsBiases( adLR, aiBatchSize )
+
+            # Clear gradients
+            aorSelf.MClearGradients( aiBatchSize )
+
+         print( "Epoch: ", kiEpoch, " Error: ", kdError )
+
+   def MBackPropagate( aorSelf, aoX, aiY, aiB ) :
       kiCountLn = len( aorSelf.voLayersN )   # Number of NN Layers
       kiCountLc = len( aorSelf.voLayersC )   # Number of CNN Layers
 
@@ -100,134 +114,145 @@ class TcCNNDeep( object ) :
          koLayer.vdGb[ aiB ] = koLayer.vdGb[ aiB ] + koLayer.vdD[ aiB ]
             
          if( kiI == 0 ) : # First NN Layer connected to CNN last layer via flatten
-            koLayer.vdGw[ aiB ] = koLayer.vdGw[ aiB ] + voNP.dot( koLayer.vdD[ aiB ], aorSelf.voFlatten[ aiB ][ 0 ].vdData.T  )
+            koLayer.vdGw[ aiB ] = koLayer.vdGw[ aiB ] + voNP.dot( koLayer.vdD[ aiB ], aorSelf.voFlatten[ aiB ].vdData.T  )
          else :
             koLayer.vdGw[ aiB ] = koLayer.vdGw[ aiB ] + voNP.dot( koLayer.vdD[ aiB ], aorSelf.voLayersN[ kiI - 1].vdA[ aiB ].T ) 
      
-     # // compute delta on the output of SS (flat) layer of all feature maps
-     # Matrix deltaSSFlat = this.LayerList[0].W.Transpose() * this.LayerList[0].Delta[b];
-     #
-     # // do reverse flattening and distribute the deltas on
-     # // each feature map's SS (SubSampling layer)
-     # int index = 0;
-     # // last CNN layer
-     # foreach (FeatureMap fmp in CNNLayerList[CNNLayerList.Count - 1].FeatureMapList)
-     # {
-     #       fmp.DeltaSS[b] = new Matrix(fmp.OutPutSS[b].Rows, fmp.OutPutSS[b].Cols);
-     #       for (int m = 0; m < fmp.OutPutSS[b].Rows; m++)
-     #       {
-     #          for (int n = 0; n < fmp.OutPutSS[b].Cols; n++)
-     #          {
-     #             fmp.DeltaSS[b].D[m][n] = deltaSSFlat.D[index][0];
-     #             index++;
-     #          }
-     #       }
-     # }
-     # // process CNN layers in reverse order, from last layer towards input
-     # for (int cnnCount = CNNLayerList.Count - 1; cnnCount >= 0; cnnCount--)
-     # {
-     #       // compute deltas on the C layers - distrbute deltas from SS layer
-     #       // then multiply by the activation function
-     #       //foreach (FeatureMap fmp in CNNLayerList[cnnCount].FeatureMapList)
-     #       //Parallel.For(0, CNNLayerList[cnnCount].FeatureMapList.Count, (k) =>
-     #       for (int k = 0; k < CNNLayerList[cnnCount].FeatureMapList.Count; k++)
-     #       {
-     #          FeatureMap fmp = CNNLayerList[cnnCount].FeatureMapList[k];
-     #          int indexm = 0; int indexn = 0;
-     #          fmp.DeltaCV[b] = new Matrix(fmp.OutPutSS[b].Rows * 2, fmp.OutPutSS[b].Cols * 2);
-     #          for (int m = 0; m < fmp.DeltaSS[b].Rows; m++)
-     #          {
-     #             indexn = 0;
-     #             for (int n = 0; n < fmp.DeltaSS[b].Cols; n++)
-     #             {
-     #                   if (fmp.activationType == ActivationType.SIGMOID)
-     #                   {
-     #                      fmp.DeltaCV[b].D[indexm][indexn] = (1 / 4.0) * fmp.DeltaSS[b].D[m][n] * fmp.APrime[b].D[indexm][indexn];
-     #                      fmp.DeltaCV[b].D[indexm][indexn + 1] = (1 / 4.0) * fmp.DeltaSS[b].D[m][n] * fmp.APrime[b].D[indexm][indexn + 1];
-     #                      fmp.DeltaCV[b].D[indexm + 1][indexn] = (1 / 4.0) * fmp.DeltaSS[b].D[m][n] * fmp.APrime[b].D[indexm + 1][indexn];
-     #                      fmp.DeltaCV[b].D[indexm + 1][indexn + 1] = (1 / 4.0) * fmp.DeltaSS[b].D[m][n] * fmp.APrime[b].D[indexm + 1][indexn + 1];
-     #                      indexn = indexn + 2;
-     #                   }
-     #                   if (fmp.activationType == ActivationType.RELU)
-     #                   {
-     #                      if (fmp.Sum[b].D[indexm][indexn] > 0)
-     #                         fmp.DeltaCV[b].D[indexm][indexn] = (1 / 4.0) * fmp.DeltaSS[b].D[m][n];
-     #                      else
-     #                         fmp.DeltaCV[b].D[indexm][indexn] = 0;
-     #                      if (fmp.Sum[b].D[indexm][indexn + 1] > 0)
-     #                         fmp.DeltaCV[b].D[indexm][indexn + 1] = (1 / 4.0) * fmp.DeltaSS[b].D[m][n];
-     #                      else
-     #                         fmp.DeltaCV[b].D[indexm][indexn + 1] = 0;
-     #                      if (fmp.DeltaCV[b].D[indexm + 1][indexn] > 0)
-     #                         fmp.DeltaCV[b].D[indexm + 1][indexn] = (1 / 4.0) * fmp.DeltaSS[b].D[m][n];
-     #                      else
-     #                         fmp.DeltaCV[b].D[indexm + 1][indexn] = 0;
-     #                      if (fmp.DeltaCV[b].D[indexm + 1][indexn + 1] > 0)
-     #                         fmp.DeltaCV[b].D[indexm + 1][indexn + 1] = (1 / 4.0) * fmp.DeltaSS[b].D[m][n];
-     #                      else
-     #                         fmp.DeltaCV[b].D[indexm + 1][indexn + 1] = 0;
-     #                      indexn = indexn + 2;
-     #                   }
-     #             }
-     #             indexm = indexm + 2;
-     #          }
-     #       }
-     #
-     #       //----------compute BiasGrad in current CNN Layer-------
-     #       foreach (FeatureMap fmp in CNNLayerList[cnnCount].FeatureMapList)
-     #       {
-     #          for (int u = 0; u < fmp.DeltaCV[b].Rows; u++)
-     #          {
-     #             for (int v = 0; v < fmp.DeltaCV[b].Cols; v++)
-     #                   lock (olock)
-     #                   {
-     #                      fmp.BiasGrad += fmp.DeltaCV[b].D[u][v];
-     #                   }
-     #          }
-     #       }
-     #       //----------compute gradients for pxq kernels in current CNN layer--------
-     #       if (cnnCount > 0)  // not the first CNN layer
-     #       {
-     #          for (int p = 0; p < CNNLayerList[cnnCount - 1].FeatureMapList.Count; p++)
-     #          //Parallel.For(0, CNNLayerList[cnnCount - 1].FeatureMapList.Count, (p) =>
-     #          {
-     #             for (int q = 0; q < CNNLayerList[cnnCount].FeatureMapList.Count; q++)
-     #             {
-     #                   lock (olock)
-     #                   {
-     #                      CNNLayerList[cnnCount].KernelGrads[p, q] = CNNLayerList[cnnCount].KernelGrads[p, q] +
-     #                         CNNLayerList[cnnCount - 1].FeatureMapList[p].OutPutSS[b].RotateBy90().RotateBy90().Convolution(CNNLayerList[cnnCount].FeatureMapList[q].DeltaCV[b]);
-     #                   }
-     #             }
-     #          }
-     #          //---------------this layer is done, now backpropagate to prev CNN Layer----------
-     #          for (int p = 0; p < CNNLayerList[cnnCount - 1].FeatureMapList.Count; p++)
-     #          //Parallel.For(0, CNNLayerList[cnnCount - 1].FeatureMapList.Count, (p) =>
-     #          {
-     #             int size = CNNLayerList[cnnCount - 1].FeatureMapList[p].OutPutSS[b].Rows;
-     #             CNNLayerList[cnnCount - 1].FeatureMapList[p].DeltaSS[b] = new Matrix(size, size);
-     #             //CNNLayerList[cnnCount - 1].FeatureMap2List[p].DeltaSS.Clear();
-     #             for (int q = 0; q < CNNLayerList[cnnCount].FeatureMapList.Count; q++)
-     #             {
-     #                   CNNLayerList[cnnCount - 1].FeatureMapList[p].DeltaSS[b] = CNNLayerList[cnnCount - 1].FeatureMapList[p].DeltaSS[b] +
-     #                   CNNLayerList[cnnCount].FeatureMapList[q].DeltaCV[b].ConvolutionFull(
-     #                   CNNLayerList[cnnCount].Kernels[p, q].RotateBy90().RotateBy90());
-     #             }
-     #          }
-     #       }
-     #       else  // very first CNN layer which is connected to input
-     #       {     // has 1xnumFeaturemaps 2-D array of Kernels and Kernel Gradients
-     #          //----------compute gradient for first layer cnn kernels--------
-     #          for (int p = 0; p < 1; p++)
-     #          {
-     #             for (int q = 0; q < CNNLayerList[cnnCount].FeatureMapList.Count; q++)
-     #             {
-     #                   lock (olock)
-     #                   {
-     #                      CNNLayerList[cnnCount].KernelGrads[p, q] = CNNLayerList[cnnCount].KernelGrads[p, q] +
-     #                         InputDataList[dj + b].RotateBy90().RotateBy90().Convolution(CNNLayerList[cnnCount].FeatureMapList[q].DeltaCV[b]);
-     #                   }
-     #             }
-     #          }
-     #       }
-     # }
+      # Compute delta on the output of SS (flat) layer of all feature maps
+      kdDss = voNP.dot( aorSelf.voLayersN[ 0 ].vdW.T, aorSelf.voLayersN[ 0 ].vdD[ aiB ] )
+
+      # Reverse flattening and distribute the deltas on each feature map's SS (SubSampling layer)
+      koLayer = aorSelf.voLayersC[ kiCountLc - 1 ]
+      kiI = 0
+      for kiF in range( len( koLayer.voFM ) ) :
+         koFM = koLayer.voFM[ kiF ]
+         koFM.voDeltaSS[ aiB ] = TcMatrix( koFM.voOutputSS[ aiB ].viRows, koFM.voOutputSS[ aiB ].viCols )
+         for kiR in range( koFM.voOutputSS[ aiB ].viRows ) :
+            for kiC in range( koFM.voOutputSS[ aiB ].viCols ) :
+               koFM.voDeltaSS[ aiB ].vdData[ kiR ][ kiC ] = kdDss[ kiI ]
+               kiI += 1
+     
+      # Process CNN layers in reverse order, from last layer towards input
+      for kiI in range( kiCountLc - 1, -1, -1 ) :
+         koLayer   = aorSelf.voLayersC[ kiI ]
+         kiCountFM = len( koLayer.voFM )
+
+         # Compute deltas on the C layers - distrbute deltas from SS layer then multiply by the activation function
+         for kiF in range( kiCountFM ) :
+            koFM = koLayer.voFM[ kiF ]
+            koFM.voDeltaCV[ aiB ] = TcMatrix( koFM.voOutputSS[ aiB ].viRows * 2, koFM.voOutputSS[ aiB ].viCols * 2 )
+
+            kiIm = 0
+            for kiM in range( koFM.voDeltaSS[ aiB ].viRows ) :
+               kiIn = 0
+               for kiN in range( koFM.voDeltaSS[ aiB ].viCols ) :
+                  if( koFM.veActivation == TeActivation.XeSigmoid ) :
+                     koFM.voDeltaCV[ aiB ].vdData[ aiIm     ][ aiIn     ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.APrime[ aiB ].vdData[ kiIm     ][ kiIn     ]
+                     koFM.voDeltaCV[ aiB ].vdData[ aiIm     ][ aiIn + 1 ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.APrime[ aiB ].vdData[ kiIm     ][ kiIn + 1 ]
+                     koFM.voDeltaCV[ aiB ].vdData[ aiIm + 1 ][ aiN      ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.APrime[ aiB ].vdData[ kiIm + 1 ][ kiIn     ]
+                     koFM.voDeltaCV[ aiB ].vdData[ aiIm + 1 ][ aiN  + 1 ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.APrime[ aiB ].vdData[ kiIm + 1 ][ kiIn + 1 ]
+                  if( koFM.veActivation == TeActivation.XeRELU ) :
+                     if( koFM.voSum[ aiB ].vdData[ kiIm ][ kiIn ] > 0 ) :
+                        koFM.voDeltaCV[ aiB ].vdData[ kiM ][ kiIn ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ]
+                     else :
+                        koFM.voDeltaCV[ aiB ].vdData[ kiM ][ kiIn ] = 0
+                     if( koFM.voSum[ aiB ].vdData[ kiIm ][ kiIn + 1 ] > 0 ) :
+                        koFM.voDeltaCV[ aiB ].vdData[ kiIm ][ kiIn + 1 ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ]
+                     else :
+                        koFM.voDeltaCV[ aiB ].vdData[ kiIm ][ kiIn + 1 ] = 0
+                     if( koFM.voDeltaCV[ aiB ].vdData[ kiIm + 1 ][ kiIn ] > 0 ) :
+                        koFM.voDeltaCV[ aiB ].vdData[ kiIm + 1 ][ kiIn ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ]
+                     else :
+                        koFM.voDeltaCV[ aiB ].vdData[ kiIm + 1 ][ kiIn ] = 0
+                     if( koFM.voDeltaCV[ aiB ].vdData[ kiIm + 1 ][ kiIn + 1 ] > 0 ) :
+                        koFM.voDeltaCV[ aiB ].vdData[ kiIm + 1 ][ kiIn + 1 ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ]
+                     else :
+                        koFM.voDeltaCV[ aiB ].vdData[ kiIm + 1 ][ kiIn + 1 ] = 0
+                  kiIn = kiIn + 2
+               kiIm = kiIm + 2
+   
+         # Compute Bias Gradients in current CNN Layer
+         for kiF in range( kiCountFM ) :
+            koFM = koLayer.voFM[ kiF ]
+            for kiU in range( koFM.voDeltaCV[ aiB ].viRows ) :
+               for kiV in range( koFM.voDeltaCV[ aiB ].viCols ) :
+                  koFM.vdGb += koFM.voDeltaCV[ aiB ].vdData[ kiU ][ kiV ]
+            
+         # Compute gradients for pxq kernels in current CNN layer
+         if( kiI > 0 ) : # If not the first CNN layer
+            koPrev = aorSelf.voLayersC[ kiI - 1 ]
+            for kiP in range( len( koPrev.voFM ) ) :
+               for kiQ in range( len( koLayer.voFM ) ) :
+                  koMat = koPrev.voFM[ kiP ].voOutputSS[ aiB ].MRotate90( ).MRotate90( )
+                  koLayer.voKernelsG[ kiP ][ kiQ ].vdData = koLayer.voKernelsG[ kiP ][ kiQ ].vdData + koMat.MConvolve( koLayer.voFM[ kiQ ].voDeltaCV[ aiB ] ).vdData
+
+            # Backpropagate to prev CNN Layer
+            for kiP in range( len( koPrev.voFM ) ) :
+               kiSize = koPrev.voFM[ kiP ].voOutputSS[ aiB ].viRows
+               koPrev.voFM[ kiP ].voDeltaSS[ aiB ] = TcMatrix( kiSize, kiSize )
+               for kiQ in range( len( koLayer.voFM ) ) :
+                  koPrev.voFM[ kiP ].voDeltaSS[ aiB ].vdData = koPrev.voFM[ kiP ].voDeltaSS[ aiB ].vdData + \
+                                                               koLayer.voFM[ kiQ ].voDeltaCV[ aiB ].MConvolveFull( \
+                                                                  koLayer.voKernels[ kiP ][ kiQ ].MRotate90( ).MRotate90( ) ).vdData
+     
+         else : # First CNN layer which is connected to input
+            # Has 1 x len( voFM ) 2-D array of Kernels and Kernel Gradients
+            # Compute gradient for first layer cnn kernels
+            for kiQ in range( len( koLayer.voFM ) ) :
+               koLayer.voKernelsG[ 0 ][ kiQ ].vdData = koLayer.voKernelsG[ 0 ][ kiQ ].vdData + aoX.MRotate90( ).MRotate90( ).MConvolve( koLayer.voFM[ kiQ ].voDeltaCV[ aiB ] ).vdData
+
+
+   def MClearGradients( aorSelf, aiB ) :
+      for kiI in range( len( aorSelf.voLayersC ) ) :
+         koLayer = aorSelf.voLayersC[ kiI ]
+
+         if( kiI == 0 ) : # First CNN Layer
+            for kiQ in range( len( koLayer.voFM ) ) :
+               koLayer.voKernelsG[ 0 ][ kiQ ].MClear( )
+         else :
+            koPrev = aorSelf.voLayersC[ kiI - 1 ]
+            for kiP in range( len( koPrev.voFM ) ) :
+               for kiQ in range( len( koLayer.voFM ) ) :
+                  koLayer.voKernelsG[ kiP ][ kiQ ].MClear( );
+                
+         for kiF in range( len( koLayer.voFM ) ) :
+            koLayer.voFM[ kiF ].vdGb = 0.0
+         
+      for kiI in range( len( aorSelf.voLayersN ) ) :
+         koLayer = aorSelf.voLayersN[ kiI ]
+         koLayer.vdGw = voNP.zeros( koLayer.vdGw.shape )
+         koLayer.vdGb = voNP.zeros( koLayer.vdGb.shape )
+
+   def MUpdateWeightsBiases( aorSelf, adLR, aiBatchSize ) :
+      kiCountLc = len( aorSelf.voLayersC )
+      kiCountLn = len( aorSelf.voLayersN )
+      
+      # Update kernels and weights
+      for kiI in range( kiCountLc ) :
+         koLayer = aorSelf.voLayersC[ kiI ]
+
+         if( kiI == 0 ) : # First CNN layer
+            for kiQ in range( len( koLayer.voFM ) ) :
+               koLayer.voKernels[ 0 ][ kiQ ].vdData = koLayer.voKernels[ 0 ][ kiQ ].vdData - \
+                                                      voNP.multiply( koLayer.voKernelsG[ 0 ][ kiQ ].vdData, adLR * ( 1.0 / aiBatchSize ) )
+         else : # Intermediate CNN Layers
+            koPrev = aorSelf.voLayersC[ kiI - 1 ]
+
+            for kiP in range( len( koPrev.voFM ) ) :
+               for kiQ in range( len( koLayer.voFM ) ) :
+                  koLayer.voKernels[ kiP ][ kiQ ].vdData = koLayer.voKernels[ kiP ][ kiQ ].vdData - \
+                                                           voNP.multiply( koLayer.voKernelsG[ kiP ][ kiQ ].vdData, adLR * ( 1.0 / aiBatchSize ) )
+                
+         for kiF in range( len( koLayer.voFM ) ) :
+            koFM = koLayer.voFM[ kiF ]
+            koFM.vdBias = koFM.vdBias - ( ( koFM.vdGb / aiBatchSize ) * adLR )
+
+      # Update Regular NN Layers
+      for kiI in range( kiCountLn ) :
+         koLayer = aorSelf.voLayersN[ kiI ]
+         kdGw = koLayer.vdGw.sum( axis = 0 )
+         kdGb = koLayer.vdGb.sum( axis = 0 )
+
+         koLayer.vdW = koLayer.vdW - ( kdGw * ( 1.0 / aiBatchSize ) * adLR )
+         koLayer.vdB = koLayer.vdB - ( kdGb * ( 1.0 / aiBatchSize ) * adLR )
+

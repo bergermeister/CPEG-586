@@ -27,6 +27,30 @@ def MReadMNIST( aoPath ) :
 
    return( kdX, kdY )
 
+def MComputeAccuracy( aoCNN, aoPath ) :
+   kdTotal = 0.0
+   kdAccuracy = 0.0
+
+   for koFilename in os.listdir( aoPath ) :
+      kdTotal += 1.0
+      kdX = cv2.imread( aoPath + '{0}'.format( koFilename ), 0 ) / 255.0
+      kdY = voNP.zeros( ( 10, 1 ) )
+      kiY = int( koFilename[ 0 ] )
+      koX = TcMatrix( kdX.shape[ 0 ], kdX.shape[ 1 ] )
+      koX.vdData = kdX
+
+      kdRes = aoCNN.MForwardPass( koX, 0 )
+      for kiI in range( len( kdRes ) ) :
+         kdMax = -1.0
+         kiIndex = -1
+         if( kdRes[ kiI ][ 0 ] > kdMax ) :
+            kdMax = kdRes[ kiI ][ 0 ]
+            kiIndex = kiI
+      if( kiIndex == kiY ) :
+         kdAccuracy += 1.0
+
+   return( kdAccuracy / kdTotal )
+
 def main( ) :
    #Set location of MNIST data
    koMNIST = '../../MNIST/'
@@ -55,6 +79,12 @@ def main( ) :
 
    # Train the CNN
    koCNN.MTrain( kdTrainX, kdTrainY, 30, 0.1, kiSizeBatch )
+
+   # Test the CNN
+   kdAccuracy = MComputeAccuracy( koCNN, koMNIST + 'Test10000/' )
+
+   # Print Result Accuracy
+   print( "Accuracy: ", kdAccuracy * 100.0, "%")
 
 if __name__ == "__main__" :
     main( )
