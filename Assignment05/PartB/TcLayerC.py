@@ -51,12 +51,12 @@ class TcLayerC( object ) :
             aorSelf.vdConvResults[ aiB ][ kiP ][ kiQ ] = aoX[ kiP ].MConvolve( aorSelf.voKernels[ kiP ][ kiQ ] )            
       
       for kiQ in range( aorSelf.viNumFMThis ) :
-         koSum = TcMatrix( aorSelf.vdConvResults[ aiB ][ 0 ][ 0 ].viRows, aorSelf.vdConvResults[ aiB ][ 0 ][ 0 ].viCols )
-         koSum.vdData = voNP.zeros( ( koSum.viRows, koSum.viCols ) )
+         koSum = aorSelf.vdConvolSums[ aiB ][ kiQ ].vdData
+         koSum.fill( 0 )
          for kiP in range( len( aoX ) ) :
             # Add convolution results
-            koSum.vdData += aorSelf.vdConvResults[ aiB ][ kiP ][ kiQ ].vdData
-         aorSelf.vdConvolSums[ aiB ][ kiQ ] = koSum
+            koSum += aorSelf.vdConvResults[ aiB ][ kiP ][ kiQ ].vdData
+         #aorSelf.vdConvolSums[ aiB ][ kiQ ] = koSum
       
       # Evaluate each feature map
       for kiI in range( aorSelf.viNumFMThis ) :

@@ -17,4 +17,10 @@ class TeActivation( object ) :
 
    def MSoftMax( adActual ) :
       kdE = voNP.exp( adActual )
-      return( kdE / kdE.sum( ) )
+      kdS = kdE.sum( )
+      if( kdS < 0.0001) :
+         kdR = adActual
+         kdR.fill( 0.1 )
+      else :
+         kdR = ( kdE / kdE.sum( ) )
+      return( kdR )

@@ -17,25 +17,17 @@ class TcFeatureMap( object ) :
       aorSelf.voAPrime     = voNP.ndarray( ( aiBatchSize ), dtype=TcMatrix )
       aorSelf.voSum        = voNP.ndarray( ( aiBatchSize ), dtype=TcMatrix )
       aorSelf.vdBias       = voNP.random.uniform( low=-0.1, high=0.1 )
-      aorSelf.vdGb         = 0.0    # Bias Gradient
-      aorSelf.voGk         = TcMatrix( 0, 0 )      # Kernel Gradients
+      aorSelf.vdGb         = voNP.zeros( ( aiBatchSize ) )   # Bias Gradient
+      #aorSelf.voGk         = None                            # Kernel Gradients
 
    def MForwardPass( aorSelf, adX, aiB ) :
-      # Copy the input to the sum
-      koSum = TcMatrix( adX.viRows, adX.viCols )
-      koSum.vdData = adX.vdData.copy( )
-      
-      # Add the bias to the sum
-      for kiR in range( koSum.vdData.shape[ 0 ] ) :
-         for kiC in range( koSum.vdData.shape[ 1 ] ) :
-            koSum.vdData[ kiR ][ kiC ] += aorSelf.vdBias
-      
-      # Save the sum at the batch index
-      aorSelf.voSum[ aiB ] = koSum
+      # Add the bias to the input data
+      aorSelf.voSum[ aiB ] = TcMatrix( adX.viRows, adX.viCols )
+      aorSelf.voSum[ aiB ].vdData = adX.vdData + aorSelf.vdBias
 
       # Create matrices for the activation function and delta
-      aorSelf.voActCV[ aiB ] = TcMatrix( koSum.viRows, koSum.viCols )
-      aorSelf.voAPrime[ aiB ] = TcMatrix( koSum.viRows, koSum.viCols )
+      aorSelf.voActCV [ aiB ] = TcMatrix( aorSelf.voSum[ aiB ].viRows, aorSelf.voSum[ aiB ].viCols )
+      aorSelf.voAPrime[ aiB ] = TcMatrix( aorSelf.voSum[ aiB ].viRows, aorSelf.voSum[ aiB ].viCols )
 
       # Apply Activation function
       if( aorSelf.veActivation == TeActivation.XeSigmoid ) :

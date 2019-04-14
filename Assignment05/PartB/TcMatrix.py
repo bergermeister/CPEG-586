@@ -22,29 +22,32 @@ class TcMatrix( object ) :
       return( aorSelf.MCorrelationFull( koRot ) )
 
    def MRotate90( aorSelf ) :
-      koRes = TcMatrix( aorSelf.viCols, aorSelf.viRows )
-      koRes.vdData = voNP.rot90( aorSelf.vdData )
+      koRes = TcMatrix( aorSelf.viRows, aorSelf.viCols )
+      #koRes.vdData = voNP.rot90( aorSelf.vdData )
+      for kiR in range( aorSelf.viRows ) :
+         for kiC in range( aorSelf.viCols ) :
+            koRes.vdData[ kiR ][ kiC ] = aorSelf.vdData[ aorSelf.viRows - kiC - 1 ][ kiR ]
       return( koRes )
 
    def MCorrelation( aorSelf, aoKernel ) :
       # No padding, assumes kernel is a square matrix, no flip of kernel
-      kiCk = aoKernel.viCols;
-      kiRm = aorSelf.viRows;
-      kiCm = aorSelf.viCols;
+      kiK = aoKernel.viCols;
+      kiM = aorSelf.viRows;
+      kiN = aorSelf.viCols;
 
-      koRes = TcMatrix( kiRm - ( kiCk - 1 ), kiCm - ( kiCk - 1 ) ); 
-      for kiR in range( koRes.viRows ) :
-         for kiC in range( koRes.viCols ) :
+      koRes = TcMatrix( kiM - ( kiK - 1 ), kiN - ( kiK - 1 ) ); 
+      for kiI in range( koRes.viRows ) :
+         for kiJ in range( koRes.viCols ) :
             kdSum = 0.0
 
             # Iterate over kernel
-            for kiI in range( kiCk ) :
-               for kiJ in range( kiCk ) :
-                  kdData = aorSelf.vdData[ kiR + kiI ][ kiC + kiJ ]
-                  kdVal  = aoKernel.vdData[ kiI ][ kiJ ]
+            for kiKi in range( kiK ) :
+               for kiKj in range( kiK ) :
+                  kdData = aorSelf.vdData[ kiI + kiKi ][ kiJ + kiKj ]
+                  kdVal  = aoKernel.vdData[ kiKi ][ kiKj ]
                   kdSum += kdData * kdVal
 
-            koRes.vdData[ kiR ][ kiC ] = kdSum;
+            koRes.vdData[ kiI ][ kiJ ] = kdSum;
 
       return( koRes )
 
