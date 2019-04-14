@@ -3,23 +3,20 @@ from TeActivation import TeActivation
 
 # Neural Network Layer
 class TcLayer( object ) :
-   def __init__( aorSelf, aorShape, aeActivation, adDropOut = 1.0, adMomentum = 0.8 ) :
-      # Save the shape (Number of Neurons, Number of Inputs) and momentum
+   def __init__( aorSelf, aorShape, aeActivation, adDropOut = 1.0 ) :
+      # Save the shape (Number of Neurons, Number of Inputs)
       aorSelf.voShape = aorShape
       aorSelf.viSizeNeurons = aorShape[ 0 ]  # Number of Neurons ( Outputs )
       aorSelf.viSizeInput   = aorShape[ 1 ]  # Number of Inputs
       aorSelf.viSizeBatch   = aorShape[ 2 ]  # Size of batch
       
-      # Save the activation, dropout rate, and momentum
+      # Save the activation and dropout rate
       aorSelf.veActivation  = aeActivation
       aorSelf.vdDropOut     = adDropOut
-      aorSelf.vdMomentum    = adMomentum
 
       # Initialize weights, biases, weight gradients, and bias gradients
       aorSelf.vdW  = voNP.random.uniform( low=-0.1, high=0.1, size=( aorSelf.viSizeNeurons, aorSelf.viSizeInput ) )
       aorSelf.vdB  = voNP.random.uniform( low=-1, high=1, size=( aorSelf.viSizeNeurons, 1 ) )
-      aorSelf.vdWg = voNP.zeros( shape=( aorSelf.viSizeNeurons, aorSelf.viSizeInput ) )
-      aorSelf.vdBg = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) )
 
       aorSelf.vdVi   = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) ) # Inverse of variance
       aorSelf.vdMu   = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) ) # Batch Mean

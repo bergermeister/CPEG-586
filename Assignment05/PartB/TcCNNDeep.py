@@ -56,8 +56,6 @@ class TcCNNDeep( object ) :
       return( kdRes )
 
    def MTrain( aorSelf, adX, adY, aiEpochs, adLR, aiBatchSize ) :
-      #koProc = voNP.ndarray( aiBatchSize, dtype=Process )
-
       freeze_support( )
       koPool = Pool( cpu_count( ) )
 
@@ -74,6 +72,10 @@ class TcCNNDeep( object ) :
 
             # Execute batch in parallel
             koRes = koPool.map( aorSelf.MLoop, koArgs )
+            #koRes = [ ]
+            #for kiB in range( aiBatchSize ) :
+            #   koRes.append( aorSelf.MLoop( koArgs[ kiB ] ) )
+            #kdL = voNP.sum( koRes )
 
             # Accumulate Error
             kdError += voNP.sum( koRes )
@@ -84,6 +86,8 @@ class TcCNNDeep( object ) :
             # Clear gradients
             aorSelf.MClearGradients( aiBatchSize )
 
+         if( ( kiEpoch % 10 ) == 0 ) :
+            adLR /= 2.0 # Reduce Learning Rate
          print( "Epoch: ", kiEpoch, " Error: ",  kdError )
 
    def MLoop( aorSelf, aoArgs ) :
@@ -121,7 +125,10 @@ class TcCNNDeep( object ) :
             if( koLayer.veActivation == TeActivation.XeSigmoid ) :   # If Activation is Sigmoid
                koLayer.vdD[ aiB ] = voNP.multiply( koLayer.vdD[ aiB ], koLayer.vdAp[ aiB ] )
             elif( koLayer.veActivation == TeActivation.XeRELU ) :
-               koLayer.vdD[ aiB ] = 1.0 * ( koLayer.vdS[ aiB ] > 0 )
+               if( koLayer.vdS[ aiB ][ kiJ ][ 0 ] < 0 ) :
+                  koLayer.vdD[ aiB ][ kiJ ][ 0 ] = 0
+               #koLayer.vdD[ aiB ] = 1.0 * ( koLayer.vdS[ aiB ] > 0 )
+               #koLayer.vdD[ aiB ] *= ( koLayer.vdS[ aiB ] >= 0 )
             
          else : # Previous Layer
             koLayer.vdD[ aiB ] = voNP.dot( aorSelf.voLayersN[ kiI + 1 ].vdW.T, aorSelf.voLayersN[ kiI + 1 ].vdD[ aiB ] )
@@ -133,7 +140,11 @@ class TcCNNDeep( object ) :
             if( koLayer.veActivation == TeActivation.XeSigmoid ) :
                koLayer.vdD[ aiB ] = voNP.multiply( koLayer.vdD[ aiB ], koLayer.vdAp[ aiB ] )
             elif( koLayer.veActivation == TeActivation.XeRELU ) :
-               koLayer.vdD[ aiB ] = 1.0 * ( koLayer.vdS[ aiB ] > 0 )
+               for kiJ in range( len( koLayer.vdS[ aiB ] ) ) :
+                  if( koLayer.vdS[ aiB ][ kiJ ][ 0 ] < 0 ) :
+                     koLayer.vdD[ aiB ][ kiJ ][ 0 ] = 0
+               #koLayer.vdD[ aiB ] = 1.0 * ( koLayer.vdS[ aiB ] > 0 )
+               #koLayer.vdD[ aiB ] *= ( koLayer.vdS[ aiB ] >= 0 )
          
          koLayer.vdGb[ aiB ] = koLayer.vdGb[ aiB ] + koLayer.vdD[ aiB ]
             
@@ -171,15 +182,15 @@ class TcCNNDeep( object ) :
                kiIn = 0
                for kiN in range( koFM.voDeltaSS[ aiB ].viCols ) :
                   if( koFM.veActivation == TeActivation.XeSigmoid ) :
-                     koFM.voDeltaCV[ aiB ].vdData[ aiIm     ][ aiIn     ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.APrime[ aiB ].vdData[ kiIm     ][ kiIn     ]
-                     koFM.voDeltaCV[ aiB ].vdData[ aiIm     ][ aiIn + 1 ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.APrime[ aiB ].vdData[ kiIm     ][ kiIn + 1 ]
-                     koFM.voDeltaCV[ aiB ].vdData[ aiIm + 1 ][ aiN      ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.APrime[ aiB ].vdData[ kiIm + 1 ][ kiIn     ]
-                     koFM.voDeltaCV[ aiB ].vdData[ aiIm + 1 ][ aiN  + 1 ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.APrime[ aiB ].vdData[ kiIm + 1 ][ kiIn + 1 ]
+                     koFM.voDeltaCV[ aiB ].vdData[ kiIm     ][ kiIn     ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.voAPrime[ aiB ].vdData[ kiIm     ][ kiIn     ]
+                     koFM.voDeltaCV[ aiB ].vdData[ kiIm     ][ kiIn + 1 ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.voAPrime[ aiB ].vdData[ kiIm     ][ kiIn + 1 ]
+                     koFM.voDeltaCV[ aiB ].vdData[ kiIm + 1 ][ kiIn     ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.voAPrime[ aiB ].vdData[ kiIm + 1 ][ kiIn     ]
+                     koFM.voDeltaCV[ aiB ].vdData[ kiIm + 1 ][ kiIn + 1 ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ] * koFM.voAPrime[ aiB ].vdData[ kiIm + 1 ][ kiIn + 1 ]
                   if( koFM.veActivation == TeActivation.XeRELU ) :
                      if( koFM.voSum[ aiB ].vdData[ kiIm ][ kiIn ] > 0 ) :
-                        koFM.voDeltaCV[ aiB ].vdData[ kiM ][ kiIn ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ]
+                        koFM.voDeltaCV[ aiB ].vdData[ kiIm ][ kiIn ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ]
                      else :
-                        koFM.voDeltaCV[ aiB ].vdData[ kiM ][ kiIn ] = 0
+                        koFM.voDeltaCV[ aiB ].vdData[ kiIm ][ kiIn ] = 0
                      if( koFM.voSum[ aiB ].vdData[ kiIm ][ kiIn + 1 ] > 0 ) :
                         koFM.voDeltaCV[ aiB ].vdData[ kiIm ][ kiIn + 1 ] = ( 1 / 4.0 ) * koFM.voDeltaSS[ aiB ].vdData[ kiM ][ kiN ]
                      else :

@@ -40,7 +40,7 @@ class TcFeatureMap( object ) :
       # Apply Activation function
       if( aorSelf.veActivation == TeActivation.XeSigmoid ) :
          aorSelf.voActCV[ aiB ].vdData = TeActivation.MSigmoid( aorSelf.voSum[ aiB ].vdData )
-         aorSelf.voAPrime[ aiB ].vdData = 1 - ( vdActCV[ aiB ].vdData ** 2 )
+         aorSelf.voAPrime[ aiB ].vdData = 1 - ( aorSelf.voActCV[ aiB ].vdData ** 2 )
       elif( aorSelf.veActivation == TeActivation.XeRELU ) :
          # No APrime for RELU, delta is made zero for negative sums
          aorSelf.voActCV[ aiB ].vdData = TeActivation.MRELU( aorSelf.voSum[ aiB ].vdData )
