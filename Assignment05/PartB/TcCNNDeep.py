@@ -55,8 +55,8 @@ class TcCNNDeep( object ) :
       return( kdRes )
 
    def MTrain( aorSelf, adX, adY, aiEpochs, adLR, aiBatchSize ) :
-      freeze_support( )
-      koPool = Pool( cpu_count( ) )
+      #freeze_support( )
+      #koPool = Pool( cpu_count( ) )
 
       for kiEpoch in range( aiEpochs ) :
          # Total Error
@@ -70,11 +70,11 @@ class TcCNNDeep( object ) :
             koArgs = [ ( kdX[ kiI + kiB ], kdY[ kiI + kiB ], kiB ) for kiB in range( aiBatchSize ) ]
 
             # Execute batch in parallel
-            koRes = koPool.map( aorSelf.MLoop, koArgs )
-            #koRes = [ ]
-            #for kiB in range( aiBatchSize ) :
-            #   koRes.append( aorSelf.MLoop( koArgs[ kiB ] ) )
-            #kdL = voNP.sum( koRes )
+            #koRes = koPool.map( aorSelf.MLoop, koArgs )
+            koRes = [ ]
+            for kiB in range( aiBatchSize ) :
+               koRes.append( aorSelf.MLoop( koArgs[ kiB ] ) )
+            kdL = voNP.sum( koRes )
 
             # Accumulate Error
             kdError += voNP.sum( koRes )
@@ -127,8 +127,6 @@ class TcCNNDeep( object ) :
                for kiJ in range( len( koLayer.vdS[ aiB ] ) ) :
                   if( koLayer.vdS[ aiB ][ kiJ ][ 0 ] < 0 ) :
                      koLayer.vdD[ aiB ][ kiJ ][ 0 ] = 0
-               #koLayer.vdD[ aiB ] = 1.0 * ( koLayer.vdS[ aiB ] > 0 )
-               #koLayer.vdD[ aiB ] *= ( koLayer.vdS[ aiB ] >= 0 )
             
          else : # Previous Layer
             koLayer.vdD[ aiB ] = voNP.dot( aorSelf.voLayersN[ kiI + 1 ].vdW.T, aorSelf.voLayersN[ kiI + 1 ].vdD[ aiB ] )
@@ -143,8 +141,6 @@ class TcCNNDeep( object ) :
                for kiJ in range( len( koLayer.vdS[ aiB ] ) ) :
                   if( koLayer.vdS[ aiB ][ kiJ ][ 0 ] < 0 ) :
                      koLayer.vdD[ aiB ][ kiJ ][ 0 ] = 0
-               #koLayer.vdD[ aiB ] = 1.0 * ( koLayer.vdS[ aiB ] > 0 )
-               #koLayer.vdD[ aiB ] *= ( koLayer.vdS[ aiB ] >= 0 )
          
          koLayer.vdGb[ aiB ] += koLayer.vdD[ aiB ]
             
@@ -216,7 +212,7 @@ class TcCNNDeep( object ) :
             koPrev = aorSelf.voLayersC[ kiI - 1 ]
             for kiP in range( len( koPrev.voFM ) ) :
                for kiQ in range( len( koLayer.voFM ) ) :
-                  koGk = koLayer.voKernelsG[ kiP ][ kiQ ].vdData
+                  koGk = koLayer.voKernelsG[ aiB ][ kiP ][ kiQ ].vdData
                   koMat = koPrev.voFM[ kiP ].voOutputSS[ aiB ].MRotate90( ).MRotate90( )
                   koGk += koMat.MConvolve( koLayer.voFM[ kiQ ].voDeltaCV[ aiB ] ).vdData
 
@@ -233,7 +229,7 @@ class TcCNNDeep( object ) :
             # Has 1 x len( voFM ) 2-D array of Kernels and Kernel Gradients
             # Compute gradient for first layer cnn kernels
             for kiQ in range( len( koLayer.voFM ) ) :
-               koGk = koLayer.voKernelsG[ 0 ][ kiQ ].vdData
+               koGk = koLayer.voKernelsG[ aiB ][ 0 ][ kiQ ].vdData
                koMat = aoX.MRotate90( ).MRotate90( )
                koGk += koMat.MConvolve( koLayer.voFM[ kiQ ].voDeltaCV[ aiB ] ).vdData
 
@@ -243,12 +239,14 @@ class TcCNNDeep( object ) :
 
          if( kiI == 0 ) : # First CNN Layer
             for kiQ in range( len( koLayer.voFM ) ) :
-               koLayer.voKernelsG[ 0 ][ kiQ ].MClear( )
+               for kiB in range( aiB ) :
+                  koLayer.voKernelsG[ kiB ][ 0 ][ kiQ ].MClear( )
          else :
             koPrev = aorSelf.voLayersC[ kiI - 1 ]
             for kiP in range( len( koPrev.voFM ) ) :
                for kiQ in range( len( koLayer.voFM ) ) :
-                  koLayer.voKernelsG[ kiP ][ kiQ ].MClear( );
+                  for kiB in range( aiB ) :
+                     koLayer.voKernelsG[ kiB ][ kiP ][ kiQ ].MClear( );
                 
          for koFM in koLayer.voFM :
             koFM.vdGb.fill( 0.0 )
@@ -265,15 +263,21 @@ class TcCNNDeep( object ) :
       for kiI in range( kiCountLc ) :
          koLayer = aorSelf.voLayersC[ kiI ]
 
+         kdGk = voNP.zeros( ( koLayer.voKernelsG[ 0 ][ 0 ][ 0 ].viRows, koLayer.voKernelsG[ 0 ][ 0 ][ 0 ].viCols ) ) 
          if( kiI == 0 ) : # First CNN layer
             for kiQ in range( len( koLayer.voFM ) ) :
-               koLayer.voKernels[ 0 ][ kiQ ].vdData -= ( koLayer.voKernelsG[ 0 ][ kiQ ].vdData / aiBatchSize ) * adLR 
+               kdGk.fill( 0 )
+               for kiB in range( aiBatchSize ) :
+                  kdGk += koLayer.voKernelsG[ kiB ][ 0 ][ kiQ ].vdData
+               koLayer.voKernels[ 0 ][ kiQ ].vdData -= ( kdGk / aiBatchSize ) * adLR 
          else : # Intermediate CNN Layers
             koPrev = aorSelf.voLayersC[ kiI - 1 ]
-
             for kiP in range( len( koPrev.voFM ) ) :
                for kiQ in range( len( koLayer.voFM ) ) :
-                  koLayer.voKernels[ kiP ][ kiQ ].vdData -= ( koLayer.voKernelsG[ kiP ][ kiQ ].vdData / aiBatchSize ) * adLR
+                  kdGk.fill( 0 )
+                  for kiB in range( aiBatchSize ) :
+                     kdGk += koLayer.voKernelsG[ kiB ][ kiP ][ kiQ ].vdData
+                  koLayer.voKernels[ kiP ][ kiQ ].vdData -= ( kdGk / aiBatchSize ) * adLR
                 
          for koFM in koLayer.voFM :
             koFM.vdBias = koFM.vdBias - ( ( koFM.vdGb.sum( ) / aiBatchSize ) * adLR )

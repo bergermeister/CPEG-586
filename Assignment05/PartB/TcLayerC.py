@@ -34,15 +34,16 @@ class TcLayerC( object ) :
 
       # Initialize Convolution Kernels
       aorSelf.voKernels  = voNP.ndarray( shape=( aorSelf.viNumFMPrev, aorSelf.viNumFMThis ), dtype=TcMatrix )
-      aorSelf.voKernelsG = voNP.ndarray( shape=( aorSelf.viNumFMPrev, aorSelf.viNumFMThis ), dtype=TcMatrix )
+      aorSelf.voKernelsG = voNP.ndarray( shape=( aorSelf.viSizeBatch, aorSelf.viNumFMPrev, aorSelf.viNumFMThis ), dtype=TcMatrix )
       for kiP in range( aorSelf.viNumFMPrev ) :       # For each feature map in previous layer
          for kiT in range( aorSelf.viNumFMThis ) :    # For each feature map in this layer
             koKernel  = TcMatrix( aorSelf.viSizeKernl, aorSelf.viSizeKernl )
-            koKernelG = TcMatrix( aorSelf.viSizeKernl, aorSelf.viSizeKernl )
             koKernel.vdData = voNP.random.uniform( low=-0.1, high=0.1, size=( koKernel.viRows, koKernel.viCols ) )
-            koKernelG.vdData = voNP.zeros( ( koKernelG.viRows, koKernelG.viCols ) )
             aorSelf.voKernels[ kiP ][ kiT ]  = koKernel
-            aorSelf.voKernelsG[ kiP ][ kiT ] = koKernelG
+            for kiB in range( aorSelf.viSizeBatch ) :
+               koKernelG = TcMatrix( aorSelf.viSizeKernl, aorSelf.viSizeKernl )
+               koKernelG.vdData = voNP.zeros( ( koKernelG.viRows, koKernelG.viCols ) )
+               aorSelf.voKernelsG[ kiB ][ kiP ][ kiT ] = koKernelG
 
    def MForwardPass( aorSelf, aoX, aiB ) :
       for kiP in range( aorSelf.viNumFMPrev ) :                # For each feature map from the previous layer
