@@ -4,6 +4,7 @@ import math
 import cv2
 import numpy as voNP
 import matplotlib.pyplot as voPlot
+from multiprocessing import Pool, freeze_support, cpu_count
 from TePool import TePool
 from TeActivation import TeActivation
 from TcLayer import TcLayer
@@ -27,29 +28,39 @@ def MReadMNIST( aoPath ) :
 
    return( kdX, kdY )
 
+def MIsMatch( aoArgs ) :
+   koCNN  = aoArgs[ 0 ]
+   koPath = aoArgs[ 1 ]
+   koFile = aoArgs[ 2 ]
+
+   kdX = cv2.imread( koPath + '{0}'.format( koFile ), 0 ) / 255.0
+   kdY = voNP.zeros( ( 10, 1 ) )
+   kiY = int( koFile[ 0 ] )
+   koX = TcMatrix( kdX.shape[ 0 ], kdX.shape[ 1 ] )
+   koX.vdData = kdX
+
+   kdRes = koCNN.MForwardPass( koX )
+   return( max( kdRes ) == kdRes[ kiY ] )
+
 def MComputeAccuracy( aoCNN, aoPath ) :
-   kdTotal = 0.0
+   freeze_support( )
+   kiCount = cpu_count( )
+   koPool = Pool( kiCount )
+   koFiles = [ ]
+
+   # Read all file names
+   for koFilename in os.listdir( aoPath ) :
+      koFiles.append( koFilename )
+
+   kdTotal    = len( koFiles )
    kdAccuracy = 0.0
 
-   for koFilename in os.listdir( aoPath ) :
-      kdTotal += 1.0
-      kdX = cv2.imread( aoPath + '{0}'.format( koFilename ), 0 ) / 255.0
-      kdY = voNP.zeros( ( 10, 1 ) )
-      kiY = int( koFilename[ 0 ] )
-      koX = TcMatrix( kdX.shape[ 0 ], kdX.shape[ 1 ] )
-      koX.vdData = kdX
+   for kiI in range( 0, kdTotal, kiCount ) :
+      koArgs = [ ( aoCNN, aoPath, koFiles[ kiB ] ) for kiB in range( kiCount ) ]
+      koRes = koPool.map( MIsMatch, koArgs )
+      kdAccuracy += voNP.sum( koRes )
 
-      kdRes = aoCNN.MForwardPass( koX, 0 )
-      for kiI in range( len( kdRes ) ) :
-         kdMax = -1.0
-         kiIndex = -1
-         if( kdRes[ kiI ][ 0 ] > kdMax ) :
-            kdMax = kdRes[ kiI ][ 0 ]
-            kiIndex = kiI
-      if( kiIndex == kiY ) :
-         kdAccuracy += 1.0
-
-   return( kdAccuracy / kdTotal )
+   return( ( kdAccuracy / kdTotal ) * 100.0 )
 
 def main( ) :
    #Set location of MNIST data
@@ -84,7 +95,7 @@ def main( ) :
    kdAccuracy = MComputeAccuracy( koCNN, koMNIST + 'Test10000/' )
 
    # Print Result Accuracy
-   print( "Accuracy: ", kdAccuracy * 100.0, "%")
+   print( "Accuracy: ", kdAccuracy, "%")
 
 if __name__ == "__main__" :
     main( )
