@@ -63,19 +63,19 @@ def main( ) :
 
    # Create a list of CNN Layers
    koCNNLayers = [ ]
-   koCNNLayers.append( TcLayerC( ( kiCountFML1, 1 ), ( 28, kiSizeKernl, kiSizeBatch ), TePool.XeAvg, TeActivation.XeRELU ) )
-   koCNNLayers.append( TcLayerC( ( kiCountFML2, kiCountFML1 ), ( 12, kiSizeKernl, kiSizeBatch ), TePool.XeAvg, TeActivation.XeRELU ) )
+   koCNNLayers.append( TcLayerC( ( kiCountFML1, 1 ), ( 28, kiSizeKernl ), TePool.XeAvg, TeActivation.XeRELU ) )
+   koCNNLayers.append( TcLayerC( ( kiCountFML2, kiCountFML1 ), ( 12, kiSizeKernl ), TePool.XeAvg, TeActivation.XeRELU ) )
 
    # Create a list of NN Layers. The second CNN layer produces an output of 4x4 per Feature Map
    koNNLayers = [ ]
-   koNNLayers.append( TcLayer( ( 50, 4 * 4 * kiCountFML2, kiSizeBatch ), TeActivation.XeRELU, 0.8 ) )
-   koNNLayers.append( TcLayer( ( 10, 50, kiSizeBatch ), TeActivation.XeSoftMax, 1 ) )
+   koNNLayers.append( TcLayer( ( 50, 4 * 4 * kiCountFML2 ), TeActivation.XeRELU, 0.8 ) )
+   koNNLayers.append( TcLayer( ( 10, 50 ), TeActivation.XeSoftMax, 1 ) )
 
    # Read MNist Training Data Set
    kdTrainX, kdTrainY = MReadMNIST( koMNIST + 'Training1000/' )
 
    # Create Deep CNN
-   koCNN = TcCNNDeep( koCNNLayers, koNNLayers, kiSizeBatch )
+   koCNN = TcCNNDeep( koCNNLayers, koNNLayers )
 
    # Train the CNN
    koCNN.MTrain( kdTrainX, kdTrainY, 30, 0.1, kiSizeBatch )

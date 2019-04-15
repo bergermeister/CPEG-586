@@ -8,7 +8,6 @@ class TcLayer( object ) :
       aorSelf.voShape = aorShape
       aorSelf.viSizeNeurons = aorShape[ 0 ]  # Number of Neurons ( Outputs )
       aorSelf.viSizeInput   = aorShape[ 1 ]  # Number of Inputs
-      aorSelf.viSizeBatch   = aorShape[ 2 ]  # Size of batch
       
       # Save the activation and dropout rate
       aorSelf.veActivation  = aeActivation
@@ -30,18 +29,18 @@ class TcLayer( object ) :
       aorSelf.vdRm = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) ) # Running batch mean
       aorSelf.vdRv = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) ) # Running batch variance
      
-      aorSelf.vdD  = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viSizeNeurons, 1 ) )                   # Delta
-      aorSelf.vdGw = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viSizeNeurons, aorSelf.viSizeInput ) ) # Weight Gradient
-      aorSelf.vdGb = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viSizeNeurons, 1 ) )                   # Bias Gradient
-      aorSelf.vdS  = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viSizeNeurons, 1 ) )                   # Sum
-      aorSelf.vdDr = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viSizeNeurons, 1 ) )                   # Drop matrix
-      aorSelf.vdA  = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viSizeNeurons, 1 ) )                   # A
-      aorSelf.vdAp = voNP.zeros( shape=( aorSelf.viSizeBatch, aorSelf.viSizeNeurons, 1 ) )                   # A prime
+      aorSelf.vdD  = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) )                   # Delta
+      aorSelf.vdGw = voNP.zeros( shape=( aorSelf.viSizeNeurons, aorSelf.viSizeInput ) ) # Weight Gradient
+      aorSelf.vdGb = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) )                   # Bias Gradient
+      aorSelf.vdS  = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) )                   # Sum
+      aorSelf.vdDr = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) )                   # Drop matrix
+      aorSelf.vdA  = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) )                   # A
+      aorSelf.vdAp = voNP.zeros( shape=( aorSelf.viSizeNeurons, 1 ) )                   # A prime
 
 
-   def MForwardPass( aorSelf, adX, aiB, abBNUse, abBNTest = False ) :
+   def MForwardPass( aorSelf, adX, abBNUse, abBNTest = False ) :
       # Calculate the Sum
-      aorSelf.vdS[ aiB ] = voNP.dot( aorSelf.vdW, adX ) + aorSelf.vdB
+      aorSelf.vdS = voNP.dot( aorSelf.vdW, adX ) + aorSelf.vdB
 
       # Batch Mean (vdMu) must be provided prior to calling this routine
       # Batch Inverse Variance (vdVi) must be provided prior to calling this routine
@@ -49,28 +48,28 @@ class TcLayer( object ) :
       # Apply Batch Normalization
       if( abBNUse == True ) :
          if( abBNTest == False ) :
-            kdSm = aorSelf.vdS[ aiB ] - aorSelf.vdMu                          # Calculate Mean Adjusted Sum
-            aorSelf.vdXh[ aiB ] = voNP.multiply( kdSm, aorSelf.vdVi )         # Multiply by the inverse variance
+            kdSm = aorSelf.vdS - aorSelf.vdMu                          # Calculate Mean Adjusted Sum
+            aorSelf.vdXh = voNP.multiply( kdSm, aorSelf.vdVi )         # Multiply by the inverse variance
          else :
-            kdSm = aorSelf.vdS[ aiB ] - aorSelf.vdRm                          # Calculate Mean Adjusted Sum
-            aorSelf.vdXh[ aiB ] = kdSm / ( ( aorSelf.vdRv + 1e-8 ) ** 0.5 )   # Adjust for variance
-         aorSelf.vdS[ aiB ] = voNP.multiply( aorSelf.vdXh, aorSelf.vdGamma ) + aorSelf.vdBeta
+            kdSm = aorSelf.vdS - aorSelf.vdRm                          # Calculate Mean Adjusted Sum
+            aorSelf.vdXh = kdSm / ( ( aorSelf.vdRv + 1e-8 ) ** 0.5 )   # Adjust for variance
+         aorSelf.vdS = voNP.multiply( aorSelf.vdXh, aorSelf.vdGamma ) + aorSelf.vdBeta
 
       # Apply Dropout
       if( aorSelf.vdDropOut < 1.0 ) :
-         aorSelf.vdDr[ aiB ] = aorSelf.MInitializeDropout( )
-         aorSelf.vdS[ aiB ] = voNP.multiply( aorSelf.vdS[ aiB ], aorSelf.vdDr[ aiB ] )
+         aorSelf.vdDr = aorSelf.MInitializeDropout( )
+         aorSelf.vdS = voNP.multiply( aorSelf.vdS, aorSelf.vdDr )
 
       # Apply Activation Function
       if( aorSelf.veActivation == TeActivation.XeSigmoid ) :
-         aorSelf.vdA[ aiB ] = TeActivation.MSigmoid( aorSelf.vdS[ aiB ] )
-         aorSelf.vdAp[ aiB ] =  aorSelf.vdA[ aiB ] * ( 1 - aorSelf.vdA[ aiB ] )
+         aorSelf.vdA = TeActivation.MSigmoid( aorSelf.vdS )
+         aorSelf.vdAp =  aorSelf.vdA * ( 1 - aorSelf.vdA )
       elif( aorSelf.veActivation == TeActivation.XeRELU ) :
-         aorSelf.vdA[ aiB ] = TeActivation.MRELU( aorSelf.vdS[ aiB ] )
+         aorSelf.vdA = TeActivation.MRELU( aorSelf.vdS )
       elif( aorSelf.veActivation == TeActivation.XeSoftMax ) :
-         aorSelf.vdA[ aiB ] = TeActivation.MSoftMax( aorSelf.vdS[ aiB ] )
+         aorSelf.vdA = TeActivation.MSoftMax( aorSelf.vdS )
 
-      return( aorSelf.vdA[ aiB ] )
+      return( aorSelf.vdA )
     
    def MInitializeDropout( aorSelf ) :
       kdDrp = voNP.random.uniform( low=0.0, high=1.0, size=( aorSelf.viSizeNeurons, 1 ) )
