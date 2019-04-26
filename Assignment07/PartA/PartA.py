@@ -1,7 +1,10 @@
+import sys
 from MNISTTF import MTestTFKeras
+from GraphApi1 import MTestGraphAPI
  
 def main():    
-   MTestTFKeras( ) 
+   #MTestTFKeras( ) 
+   MTestGraphAPI( )
  
 if __name__ == "__main__":     
-   sys.exit(int(main() or 0))
+   main( )
