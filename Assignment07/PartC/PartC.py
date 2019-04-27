@@ -8,7 +8,7 @@ def main( ) :
    koLabels = koMNIST.test.labels
 
    koTriplet = TcTriplet( )
-   koTriplet.MTrain( koMNIST, 1000, 128 )
+   koTriplet.MTrain( koMNIST.train, 1000, 128 )
 
 if __name__ == "__main__":     
    main( )

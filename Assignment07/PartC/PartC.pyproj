@@ -21,7 +21,13 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Activation.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="PartC.py" />
+    <Compile Include="Pool.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Triplet.py">
       <SubType>Code</SubType>
     </Compile>
