@@ -24,7 +24,7 @@ def main( ) :
    koLabels = koMNIST.test.labels
 
    koTriplet = TcTriplet( )
-   koTriplet.MTrain( koMNIST.train.images, koMNIST.train.labels, 30, 128 )
+   koTriplet.MTrain( koMNIST.train.images, koMNIST.train.labels, 30, 250 )
 
    koOut = koTriplet.MTest( koMNIST.test.images )
    koOut = koOut.reshape( [ -1, 2 ] ) 
