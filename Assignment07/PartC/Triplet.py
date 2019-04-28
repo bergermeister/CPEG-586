@@ -44,18 +44,18 @@ class TcTriplet( object ) :
 
       # Setup Convolutional Layers
       koLC1 = aorSelf.MLayerC( koX,   [  1,   32 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC1' )
-      koLC2 = aorSelf.MLayerC( koLC1, [ 32,   64 ], [ 3, 3 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC2' )
-      koLC3 = aorSelf.MLayerC( koLC2, [ 64,  128 ], [ 3, 3 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC3' )
+      koLC2 = aorSelf.MLayerC( koLC1, [ 32,   64 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC2' )
+      koLC3 = aorSelf.MLayerC( koLC2, [ 64,  128 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC3' )
 
       # Flatten the output
       #koFlat = voTF.reshape( koLC2, [ -1, 7 * 7 * 64 ] )
       koFlat = voTF.reshape( koLC3, [ -1, 4 * 4 * 128 ] )
 
       # Setup Dense Layers
-      # koLD1 = aorSelf.MLayerD( koFlat, [ koFlat.get_shape( )[ 1 ], 100 ], TeActivation.XeRELU, 'LD1' )
-      # koLD2 = aorSelf.MLayerD( koLD1,  [ 100, 10 ], TeActivation.XeSoftMax, 'LD2' )
+      koLD1 = aorSelf.MLayerD( koFlat, [ koFlat.get_shape( )[ 1 ], 10 ], TeActivation.XeSoftMax, 'LD1' )
+      #koLD2 = aorSelf.MLayerD( koLD1,  [ 100, 10 ], TeActivation.XeSoftMax, 'LD2' )
 
-      return( koFlat )
+      return( koLD1 )
 
    def MLayerC( aorSelf, aoX, aoShapeLayer, aoShapeKernel, aoShapePool, aeActivation, aePool, aoVarName ) :
       # Setup Shapes: Kernel Rows           Kernel Cols         Input              Num Kernels
@@ -121,25 +121,33 @@ class TcTriplet( object ) :
 
       return( koY )
 
-   def MLoss( aorSelf, aoX, aoXp, aoXn, adMargin = 5 ) :
+   def MLoss( aorSelf, aoX, aoXp, aoXn, adMargin = 0.1 ) :
       with voTF.variable_scope( "triplet" ) as koScope :
-         koNp = aorSelf.MEuclideanDistance( aoX, aoXp )
-         koNn = aorSelf.MEuclideanDistance( aoX, aoXn )
+         koDp2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( aoX, aoXp ) ), 1 )
+         koDn2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( aoX, aoXn ) ), 1 )
 
-         koEp = voTF.math.exp( koNp )
-         koEn = voTF.math.exp( koNn )
+         koLoss = voTF.maximum( 0.0, voTF.math.add( voTF.math.subtract( koDp2, koDn2 ), adMargin ) )
 
-         koDp = voTF.math.divide( koEp, voTF.math.add( koEp, koEn ) )
-         koDn = voTF.math.divide( koEn, voTF.math.add( koEp, koEn ) )
+      return( voTF.reduce_mean( koLoss ), voTF.reduce_mean( koDp2 ), voTF.reduce_mean( koDn2 ) )
+         #koNp = aorSelf.MEuclideanDistance( aoX, aoXp )
+         #koNn = aorSelf.MEuclideanDistance( aoX, aoXn )
+         #
+         #koEp = voTF.math.exp( koNp )
+         #koEn = voTF.math.exp( koNn )
+         #
+         #koDp = voTF.math.divide( koEp, voTF.math.add( koEp, koEn ) )
+         #koDn = voTF.math.divide( koEn, voTF.math.add( koEp, koEn ) )
+         #
+         #koLoss = voTF.math.divide( koDp, koDn )
 
          # koDp2 = voTF.square( aorSelf.MEuclideanDistance( aoX, aoXp ) )
          # koDn2 = voTF.square( aorSelf.MEuclideanDistance( aoX, aoXn ) )
          
          # koLoss = voTF.math.divide( koDp2, voTF.subtract( koDn2, adMargin ) )
          # voTF.maximum( 0.0, voTF.add( voTF.subtract( koDp2, koDn2 ), adMargin ) )
-         koLoss = voTF.math.divide( koDp, koDn )
+         
 
-      return( voTF.reduce_mean( koLoss ), voTF.reduce_mean( koDp ), voTF.reduce_mean( koDn ) )
+      #return( voTF.reduce_mean( koLoss ), voTF.reduce_mean( koDp ), voTF.reduce_mean( koDn ) )
       #return( voTF.reduce_mean( koLoss ), voTF.reduce_mean( koDp2 ), voTF.reduce_mean( koDn2 ) )
  
    def MEuclideanDistance( aorSelf, aoX, aoY ) :
@@ -156,39 +164,61 @@ class TcTriplet( object ) :
 
    def MTrain( aorSelf, aoX, aoY, aiEpochs, aiBatchSize = 100 ) :
       for kiEpoch in range( aiEpochs ) :
-         koX, koY = voShuffle( aoX, aoY, random_state = 0 )
-         for kiI in range( 0, int( len( koX ) ), aiBatchSize ) :
-            koInRef  = koX[ kiI : kiI + aiBatchSize ]
-            koInPos  = voNP.zeros( ( aiBatchSize, koInRef.shape[ 1 ] ) )
-            koInNeg  = voNP.zeros( ( aiBatchSize, koInRef.shape[ 1 ] ) )
-            for kiB in range( aiBatchSize ) :
-               koComp = aorSelf.MComparator( kiI + kiB, koX, koY ) 
-               koInPos[ kiB ] = koComp[ 0 ]
-               koInNeg[ kiB ] = koComp[ 1 ]
-            
+         koInRef, koInPos, koInNeg = aorSelf.MGetTriplets( aoX, aoY, 10000 )
+         for kiI in range( 0, int( len( koInRef ) ), aiBatchSize ) :            
             _, kdLoss = aorSelf.voSession.run( [ aorSelf.voOptimizer, aorSelf.vdLoss ],
-                                               feed_dict = { aorSelf.voInRef: koInRef, 
-                                                             aorSelf.voInPos: koInPos, 
-                                                             aorSelf.voInNeg: koInNeg } )
+                                               feed_dict = { aorSelf.voInRef: koInRef[ kiI : kiI + aiBatchSize ], 
+                                                             aorSelf.voInPos: koInPos[ kiI : kiI + aiBatchSize ], 
+                                                             aorSelf.voInNeg: koInNeg[ kiI : kiI + aiBatchSize ] } )
          print( 'Loss: %.3f' % ( kdLoss[ 0 ] ) )
 
-   def MComparator( aorSelf, aiI, aoX, aoY ) : 
-      # Get index lists of positives and negatives
-      koPos = voNP.where( aoY == aoY[ aiI ] )[ 0 ]
-      koNeg = voNP.where( aoY != aoY[ aiI ] )[ 0 ]
+   def MGetTriplets( aorSelf, aoX, aoY, aiSize ) :
+      # Randomize inputs
+      koX, koY = voShuffle( aoX, aoY, random_state = 0 )
 
-      # Randomize the indeces
-      #voNP.random.shuffle( koPos )
-      #voNP.random.shuffle( koNeg )
+      # Create Reference, Positive, and Negative arrays
+      koRef = voNP.zeros( shape = ( aiSize, aoX.shape[ 1 ] ), dtype = 'float32' )
+      koPos = voNP.zeros( shape = ( aiSize, aoX.shape[ 1 ] ), dtype = 'float32' )
+      koNeg = voNP.zeros( shape = ( aiSize, aoX.shape[ 1 ] ), dtype = 'float32' )
+      for kiI in range( aiSize ) :
+         # Select 2 random labels
+         kiSelect = voNP.random.choice( aoY, 2, replace = False )
+         koYp = kiSelect[ 0 ]                   # Positive label
+         koYn = kiSelect[ 1 ]                   # Negative label
+         kiIp = voNP.where( aoY == koYp )[ 0 ]  # Get indeces of positive labels
+         kiIn = voNP.where( aoY == koYn )[ 0 ]  # Get indeces of negative labels
 
-      if( koPos[ 0 ] == aiI ) :
-         kiIp = koPos[ 1 ]
-      else :
-         kiIp = koPos[ 0 ]
+         # Randomize indeces
+         voNP.random.shuffle( kiIp )
+         voNP.random.shuffle( kiIn )
 
-      kiIn = koNeg[ 0 ]
+         # Pick samples
+         koRef[ kiI ] = aoX[ kiIp[ 0 ] ]
+         koPos[ kiI ] = aoX[ kiIp[ 1 ] ]
+         koNeg[ kiI ] = aoX[ kiIn[ 0 ] ]
 
-      return( aoX[ kiIp ], aoX[ kiIn ] )
+         ## Store the current element as the reference / anchor
+         #koRef[ kiI ] = aoX[ kiI ]
+         #
+         ## Get the label of the current element
+         #koLabel = aoY[ kiI ]
+         #
+         ## Get list of indeces for positives and negatives
+         #kiIp = voNP.where( aoY == koLabel )[ 0 ]
+         #kiIn = voNP.where( aoY != koLabel )[ 0 ]
+         #
+         ## Randomize the choice
+         #voNP.random.shuffle( kiIp )
+         #voNP.random.shuffle( kiIn )
+         #
+         #if( kiIp[ 0 ] != kiI ) :
+         #   koPos[ kiI ] = aoX[ kiIp[ 0 ] ]
+         #else :
+         #   koPos[ kiI ] = aoX[ kiIp[ 1 ] ]
+         #
+         #koNeg[ kiI ] = aoX[ kiIn[ 0 ] ]
+
+      return( koRef, koPos, koNeg )
 
    def MTest( aorSelf, aoX ) :
       koY = aorSelf.voSession.run( aorSelf.voOutRef, feed_dict = { aorSelf.voInRef: aoX } )         
