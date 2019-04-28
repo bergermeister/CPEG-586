@@ -27,7 +27,19 @@
     <Compile Include="MNISTTF.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="NNGraph1.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="NNGraph2.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="PartA.py" />
+    <Compile Include="QuadraticGraph.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Siamese.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="SimpleGraph.py">
       <SubType>Code</SubType>
     </Compile>
