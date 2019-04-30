@@ -39,7 +39,7 @@ def MIsMatch( aoArgs ) :
    koX = TcMatrix( kdX.shape[ 0 ], kdX.shape[ 1 ] )
    koX.vdData = kdX
 
-   kdRes = koCNN.MForwardPass( koX )
+   kdRes = koCNN.MNetworkClassifier( koX )
    return( max( kdRes ) == kdRes[ kiY ] )
 
 def MComputeAccuracy( aoCNN, aoPath ) :
@@ -89,7 +89,8 @@ def main( ) :
    koCNN = TcCNNSiamese( koCNNLayers, koNNLayers )
 
    # Train the CNN
-   koCNN.MTrain( kdTrainX, kdTrainY, 30, 0.1, kiSizeBatch )
+   koCNN.MTrainModel( kdTrainX, kdTrainY, 30, 0.1, kiSizeBatch )
+   koCNN.MTrainClassifier( kdTrainX, kdTrainY, 1000, 0.1, kiSizeBatch )
 
    # Test the CNN
    kdAccuracy = MComputeAccuracy( koCNN, koMNIST + 'Test10000/' )

@@ -20,7 +20,7 @@ class TcTriplet( object ) :
       # Setup the Outputs, Loss Function, and Training MNetworkTriplet
       aorSelf.voOutRef, aorSelf.voOutPos, aorSelf.voOutNeg = aorSelf.MNetworkTriplet( )
       aorSelf.voOutput = aorSelf.MNetworkClassifier( )
-      aorSelf.vdLossTriplet = aorSelf.MLossTriplet( aorSelf.voOutRef, aorSelf.voOutPos, aorSelf.voOutNeg )
+      aorSelf.vdLossTriplet = aorSelf.MLossTriplet( )
       aorSelf.vdLossCrossE  = aorSelf.MLossCrossEntropy( )
       aorSelf.voOptimizerTriplet = aorSelf.MOptimizerTriplet( )
       aorSelf.voOptimizerCrossE  = aorSelf.MOptimizerCrossE( )
@@ -107,19 +107,22 @@ class TcTriplet( object ) :
       #koFlat = voTF.reshape( koLC2, [ -1, 7 * 7 * 64 ] )
       koFlat = voTF.reshape( koLC3, [ -1, 4 * 4 * 128 ] )
 
+      #koX = aoInput
+      #koLE1 = aorSelf.MLayerD( koX,   [ 784, 500 ], TeActivation.XeRELU, 'LE1', abTrainable )
+      #koLE2 = aorSelf.MLayerD( koLE1, [ 500, 250 ], TeActivation.XeRELU, 'LE2', abTrainable )
+      #koLE3 = aorSelf.MLayerD( koLE2, [ 250, 128 ], TeActivation.XeNone, 'LE3', abTrainable )
+      #koFlat = koLE3
+
       return( koFlat )
 
    def MNetworkTriplet( aorSelf ) :
       with voTF.variable_scope( "triplet" ) as koScope :
-         koOutRef = aorSelf.MCNN( aorSelf.voInRef )
+         koOutRef = aorSelf.MCNN( aorSelf.voInRef, True )
          
          # Share weights
          koScope.reuse_variables( )
-         koOutPos = aorSelf.MCNN( aorSelf.voInPos )
-
-         # Share weights
-         #koScope.reuse_variables( )
-         koOutNeg = aorSelf.MCNN( aorSelf.voInNeg )
+         koOutPos = aorSelf.MCNN( aorSelf.voInPos, True )
+         koOutNeg = aorSelf.MCNN( aorSelf.voInNeg, True )
 
       return( koOutRef, koOutPos, koOutNeg )
 
@@ -130,17 +133,26 @@ class TcTriplet( object ) :
          koA1  = voTF.nn.relu( koCNN )
 
          # Setup Dense Layers
-         koLD1 = aorSelf.MLayerD( koA1, [ koA1.get_shape( )[ 1 ], 100 ], TeActivation.XeSoftMax, 'LD1' )
-         koLD2 = aorSelf.MLayerD( koLD1,  [ 100, 10 ], TeActivation.XeNone, 'LD2' )
+         koLD1 = aorSelf.MLayerD( koA1, [ koA1.get_shape( )[ 1 ], 100 ], TeActivation.XeRELU, 'LD1' )
+         koLD2 = aorSelf.MLayerD( koLD1,  [ 100, 10 ], TeActivation.XeSoftMax, 'LD2' )
 
       return( koLD2 )
 
-   def MLossTriplet( aorSelf, aoX, aoXp, aoXn, adMargin = 0.2 ) :
+   def MLossTriplet( aorSelf ) :
       with voTF.variable_scope( "triplet" ) as koScope :
-         koDp2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( aoX, aoXp ) ), 1 )
-         koDn2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( aoX, aoXn ) ), 1 )
+         kdMargin = 0.2
+         koX = aorSelf.voOutRef
+         koXp = aorSelf.voOutPos
+         koXn = aorSelf.voOutNeg
 
-         koLoss = voTF.maximum( 0.0, voTF.math.add( voTF.math.subtract( koDp2, koDn2 ), adMargin ) )
+         koDp2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXp ) ), 1 )
+         koDn2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXn ) ), 1 )
+
+         #koDp2 = voTF.nn.softmax( koDp2 )
+         #koDn2 = voTF.nn.softmax( koDn2 )
+
+         #koLoss = voTF.math.divide( voTF.math.add( koDp2, adMargin ), voTF.math.add( koDn2, 1e-6 ) )
+         koLoss = voTF.maximum( 0.0, voTF.math.add( voTF.math.subtract( koDp2, koDn2 ), kdMargin ) )
 
       return( voTF.reduce_mean( koLoss ) ) #, voTF.reduce_mean( koDp2 ), voTF.reduce_mean( koDn2 ) )
 
@@ -150,7 +162,7 @@ class TcTriplet( object ) :
       return( koLoss )
 
    def MOptimizerTriplet( aorSelf ) :
-      kdLR = 0.01
+      kdLR = 0.1
       kdRng = 0
       voTF.set_random_seed( kdRng )
       koOptimizer = voTF.train.GradientDescentOptimizer( kdLR ).minimize( aorSelf.vdLossTriplet )
@@ -164,16 +176,23 @@ class TcTriplet( object ) :
       return( koOptimizer )
 
    def MTrainModel( aorSelf, aoX, aoY, aiEpochs, aiBatchSize = 100 ) :
+      koX, koY = voShuffle( aoX, aoY, random_state = 0 )
       for kiEpoch in range( aiEpochs ) :
+         kiI = kiEpoch * aiBatchSize
+         if( ( kiI + aiBatchSize ) > aoX.shape[ 0 ] ) :
+            kiI = 0
          kdLoss = 0.0
-         koInRef, koInPos, koInNeg = aorSelf.MGetTriplets( aoX, aoY, 10000 )
-         for kiI in range( 0, int( len( koInRef ) ), aiBatchSize ) :            
-            _, kdL = aorSelf.voSession.run( [ aorSelf.voOptimizerTriplet, aorSelf.vdLossTriplet ],
-                                            feed_dict = { aorSelf.voInRef: koInRef[ kiI : kiI + aiBatchSize ], 
-                                                          aorSelf.voInPos: koInPos[ kiI : kiI + aiBatchSize ], 
-                                                          aorSelf.voInNeg: koInNeg[ kiI : kiI + aiBatchSize ] } )
-            kdLoss = kdLoss + kdL
+         koInRef = koX[ kiI : kiI + aiBatchSize ]
+         koInPos, koInNeg = aorSelf.MGetTriplets( koX, koY, kiI, aiBatchSize )
+         _, kdL = aorSelf.voSession.run( [ aorSelf.voOptimizerTriplet, aorSelf.vdLossTriplet ],
+                                          feed_dict = { aorSelf.voInRef: koInRef,
+                                                         aorSelf.voInPos: koInPos,
+                                                         aorSelf.voInNeg: koInNeg } )
+         kdLoss = kdLoss + kdL
+         aorSelf.MSaveModel( )
          print( 'Loss: %.3f' % ( kdLoss ) )
+      koWriter = voTF.summary.FileWriter( "SummaryTrainingModel", aorSelf.voSession.graph )         
+      koWriter.close()   
 
    def MTrainClassifier( aorSelf, aoData, aiEpochs, aiBatchSize = 100 ) :
       for kiEpoch in range( aiEpochs ) :
@@ -188,37 +207,34 @@ class TcTriplet( object ) :
                                                           aorSelf.voY: koLabels } )
          if( kiEpoch % 10 == 0 ) :
             print( 'Epoch %d: Train Loss: %.3f' % ( kiEpoch, kdLoss ) )
+      aorSelf.MSaveModel( )
+      koWriter = voTF.summary.FileWriter( "SummaryTrainingClassifier", aorSelf.voSession.graph )         
+      koWriter.close()   
 
    def MTestModel( aorSelf, aoX ) :
       koY = aorSelf.voSession.run( aorSelf.voOutRef, feed_dict = { aorSelf.voInRef: aoX } )         
       return koY 
 
-   def MGetTriplets( aorSelf, aoX, aoY, aiSize ) :
-      # Randomize inputs
-      koX, koY = voShuffle( aoX, aoY, random_state = 0 )
-
+   def MGetTriplets( aorSelf, aoX, aoY, aiI, aiSize ) :
       # Create Reference, Positive, and Negative arrays
-      koRef = voNP.zeros( shape = ( aiSize, aoX.shape[ 1 ] ), dtype = 'float32' )
       koPos = voNP.zeros( shape = ( aiSize, aoX.shape[ 1 ] ), dtype = 'float32' )
       koNeg = voNP.zeros( shape = ( aiSize, aoX.shape[ 1 ] ), dtype = 'float32' )
-      for kiI in range( aiSize ) :
-         # Select 2 random labels
-         kiSelect = voNP.random.choice( aoY, 2, replace = False )
-         koYp = kiSelect[ 0 ]                   # Positive label
-         koYn = kiSelect[ 1 ]                   # Negative label
-         kiIp = voNP.where( aoY == koYp )[ 0 ]  # Get indeces of positive labels
-         kiIn = voNP.where( aoY == koYn )[ 0 ]  # Get indeces of negative labels
+      for kiB in range( aiSize ) :
+         kiIp = voNP.where( aoY == aoY[ aiI + kiB ] )[ 0 ]  # Get indeces of positive labels
+         kiIn = voNP.where( aoY != aoY[ aiI + kiB ] )[ 0 ]  # Get indeces of negative labels
 
          # Randomize indeces
          voNP.random.shuffle( kiIp )
          voNP.random.shuffle( kiIn )
 
          # Pick samples
-         koRef[ kiI ] = aoX[ kiIp[ 0 ] ]
-         koPos[ kiI ] = aoX[ kiIp[ 1 ] ]
-         koNeg[ kiI ] = aoX[ kiIn[ 0 ] ]
+         if( kiIp[ 0 ] != aiI + kiB ) :
+            koPos[ kiB ] = aoX[ kiIp[ 0 ] ]
+         else :
+            koPos[ kiB ] = aoX[ kiIp[ 1 ] ]
+         koNeg[ kiB ] = aoX[ kiIn[ 0 ] ]
 
-      return( koRef, koPos, koNeg )
+      return( koPos, koNeg )
 
    def MComputeAccuracy( aorSelf, aoX, aoY ):         
       koLabels = voNP.zeros( 100 )         
@@ -246,7 +262,10 @@ class TcTriplet( object ) :
       if not os.path.exists( koDir ):             
          os.makedirs( koDir )         
       # Save the latest trained models         
-      aorSelf.voSaver.save( aorSelf.voSession, koDir + koName )  
+      try:
+         aorSelf.voSaver.save( aorSelf.voSession, koDir + koName )  
+      except:
+         print( 'ERROR: Failed to save Model Parameters' )
  
    def MLoadModel( aorSelf ):         
       # restore the trained model         
@@ -255,5 +274,5 @@ class TcTriplet( object ) :
       try:
          aorSelf.voSaver.restore( aorSelf.voSession, koDir + koName )
       except:
-         print( 'Model not trained.' )
+         print( 'NOTE: Model not trained.' )
 

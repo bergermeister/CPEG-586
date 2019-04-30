@@ -70,14 +70,15 @@ class TcCNNSiamese( object ) :
 
          # Shuffle Input/Output pairs
          kdX1, kdY1 = voShuffle( adX, adY, random_state = 0 )
-         kdX2, kdY2 = voShuffle( adX, adY, random_state = 0 )
+         kdX2, kdY2 = voShuffle( adX, adY, random_state = 10 )
 
-         for kiI in range( 0, len( kdX ), aiBatchSize ) :
+         for kiI in range( 0, len( kdX1 ), aiBatchSize ) :
             # Pack the Intp
-            koArgs = [ ( kdX1[ kiI + kiB ], kdX2[ kiI + kiB ], kdY1[ kiI + kiB ] == kdY2[ kiI + kiB ] ) for kiB in range( aiBatchSize ) ]
+            koArgs = [ ( kdX1[ kiI + kiB ], kdX2[ kiI + kiB ], kdY1[ kiI + kiB ] != kdY2[ kiI + kiB ] ) for kiB in range( aiBatchSize ) ]
             
             # Execute batch in parallel
-            koRes = koPool.map( aorSelf.MLoopModel, koArgs )
+            #koRes = koPool.map( aorSelf.MLoopModel, koArgs )
+            koRes = aorSelf.MLoopModel( koArgs[ 0 ] )
 
             # Accumulate Error
             for koCNN in koRes :
@@ -145,15 +146,15 @@ class TcCNNSiamese( object ) :
       kdA2 = aorSelf.MNetworkModel( koX2 )
 
       # Calculate the contrastive loss
-      kdD = voNP.pow( kdA1 - kdA2, 2 )       # Euclidean Distance Squared
-      kdDw = voNP.reduce_sum( kdD, 1 )
+      kdD = ( kdA1.vdData - kdA2.vdData ) ** 2       # Euclidean Distance Squared
+      kdDw = voNP.sum( kdD, 1 )
       kdDw2 = voNP.sqrt( kdDw + 1e-6 )
-      kdLossS = voNP.multiply( kdY, voNP.pow( kdDw2, 2 ) )
-      kdLossD = voNP.multiply( 1 - kdY, voNP.pow( kdDw2 + kdMargin ) )
-      aorSelf.vdLossContr = voNP.reduce_mean( kdLossS + kdLossD )
+      kdLossS = voNP.multiply( 1 - kdY, kdDw2 ** 2 )
+      kdLossD = voNP.maximum( 0, voNP.multiply( kdY, ( kdMargin - kdDw2 ) ** 2 ) )
+      aorSelf.vdLossContr = voNP.mean( kdLossS + kdLossD )
 
       # Update Gradients
-      aorSelf.MUpdateModel( koX1, koY )
+      aorSelf.MUpdateModel( koX1, kdDw2, koY )
 
       return( aorSelf )
 
@@ -176,10 +177,8 @@ class TcCNNSiamese( object ) :
 
       return( aorSelf )
 
-   def MUpdateModel( aorSelf, aoX, aiY ) :
+   def MUpdateModel( aorSelf, aoX, adDw, aiY ) :
       kiCountLc = len( aorSelf.voLayersC ) # Number of CNN Layers
-      # Compute delta on the output of SS (flat) layer of all feature maps
-      kdDss = voNP.dot( aorSelf.voLayersN[ 0 ].vdW.T, aorSelf.voLayersN[ 0 ].vdD )
 
       # Reverse flattening and distribute the deltas on each feature map's SS (SubSampling layer)
       koLayer = aorSelf.voLayersC[ kiCountLc - 1 ]
@@ -188,7 +187,7 @@ class TcCNNSiamese( object ) :
          koFM.voDeltaSS = TcMatrix( koFM.voOutputSS.viRows, koFM.voOutputSS.viCols )
          for kiM in range( koFM.voOutputSS.viRows ) :
             for kiN in range( koFM.voOutputSS.viCols ) :
-               koFM.voDeltaSS.vdData[ kiM ][ kiN ] = kdDss[ kiI ]
+               koFM.voDeltaSS.vdData[ kiM ][ kiN ] = adDw[ kiI ]
                kiI += 1
      
       # Process CNN layers in reverse order, from last layer towards input
@@ -264,7 +263,6 @@ class TcCNNSiamese( object ) :
 
    def MUpdateClassifier( aorSelf, aoX, aiY ) :
       kiCountLn = len( aorSelf.voLayersN )   # Number of NN Layers
-      kiCountLc = len( aorSelf.voLayersC )   # Number of CNN Layers
 
       # Compute Deltas on regular NN layers
       for kiI in range( kiCountLn - 1, -1, -1 ) :  # For each NN Layer, starting with last and working towards first
@@ -297,29 +295,9 @@ class TcCNNSiamese( object ) :
          if( kiI == 0 ) : # First NN Layer connected to CNN last layer via flatten
             koLayer.vdGw += voNP.dot( koLayer.vdD, aorSelf.voFlatten.vdData.T  )
          else :
-            koLayer.vdGw += voNP.dot( koLayer.vdD, aorSelf.voLayersN[ kiI - 1].vdA.T ) 
+            koLayer.vdGw += voNP.dot( koLayer.vdD, aorSelf.voLayersN[ kiI - 1].vdA.T )   
 
-   def MClearGradients( aorSelf ) :
-      for kiI in range( len( aorSelf.voLayersC ) ) :
-         koLayer = aorSelf.voLayersC[ kiI ]
-
-         if( kiI == 0 ) : # First CNN Layer
-            for kiQ in range( len( koLayer.voFM ) ) :
-               koLayer.voKernelsG[ 0 ][ kiQ ].MClear( )
-         else :
-            koPrev = aorSelf.voLayersC[ kiI - 1 ]
-            for kiP in range( len( koPrev.voFM ) ) :
-               for kiQ in range( len( koLayer.voFM ) ) :
-                  koLayer.voKernelsG[ kiP ][ kiQ ].MClear( );
-                
-         for koFM in koLayer.voFM :
-            koFM.vdGb = 0.0
-         
-      for koLayer in aorSelf.voLayersN :
-         koLayer.vdGw.fill( 0 )
-         koLayer.vdGb.fill( 0 )
-
-   def MUpdateWeightsBiases( aorSelf, adLR, aoCNN ) :
+   def MBackPropagateModel( aorSelf, adLR, aoCNN ) :
       kiCountLc = len( aorSelf.voLayersC )   # Number of CNN Layers
       kiCountLn = len( aorSelf.voLayersN )   # Number of NN Layers
       kiSizeB   = len( aoCNN )               # Batch Size
@@ -351,6 +329,7 @@ class TcCNNSiamese( object ) :
                kdGb += aoCNN[ kiB ].voLayersC[ kiI ].voFM[ kiF ].vdGb
             koFM.vdBias = koFM.vdBias - ( ( kdGb / kiSizeB ) * adLR )
 
+   def MBackPropagateClassifier( aorSelf, adLR, aoCNN ) :
       # Update Regular NN Layers
       for kiI in range( kiCountLn ) :
          koLayer = aorSelf.voLayersN[ kiI ]
@@ -364,3 +343,22 @@ class TcCNNSiamese( object ) :
          koLayer.vdW = koLayer.vdW - ( ( kdGw / kiSizeB ) * adLR )
          koLayer.vdB = koLayer.vdB - ( ( kdGb / kiSizeB ) * adLR )
 
+   def MClearGradients( aorSelf ) :
+      for kiI in range( len( aorSelf.voLayersC ) ) :
+         koLayer = aorSelf.voLayersC[ kiI ]
+
+         if( kiI == 0 ) : # First CNN Layer
+            for kiQ in range( len( koLayer.voFM ) ) :
+               koLayer.voKernelsG[ 0 ][ kiQ ].MClear( )
+         else :
+            koPrev = aorSelf.voLayersC[ kiI - 1 ]
+            for kiP in range( len( koPrev.voFM ) ) :
+               for kiQ in range( len( koLayer.voFM ) ) :
+                  koLayer.voKernelsG[ kiP ][ kiQ ].MClear( );
+                
+         for koFM in koLayer.voFM :
+            koFM.vdGb = 0.0
+         
+      for koLayer in aorSelf.voLayersN :
+         koLayer.vdGw.fill( 0 )
+         koLayer.vdGb.fill( 0 )
