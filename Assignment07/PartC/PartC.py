@@ -25,7 +25,7 @@ def main( ) :
 
    koTriplet = TcTriplet( )
    koTriplet.MLoadModel( )
-   koTriplet.MTrainModel( koMNIST.train.images, koMNIST.train.labels, 10, 100 )
+   koTriplet.MTrainModel( koMNIST.train.images, koMNIST.train.labels, 100, 100 )
    #koTriplet.MTrainClassifier( koMNIST.train, 1000, 100 )
    #koTriplet.MComputeAccuracy( koMNIST.test.images, koMNIST.test.labels )
 
