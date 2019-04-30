@@ -24,11 +24,14 @@ def main( ) :
    koLabels = koMNIST.test.labels
 
    koTriplet = TcTriplet( )
-   koTriplet.MTrain( koMNIST.train.images, koMNIST.train.labels, 10, 250 )
+   koTriplet.MLoadModel( )
+   koTriplet.MTrainModel( koMNIST.train.images, koMNIST.train.labels, 10, 100 )
+   #koTriplet.MTrainClassifier( koMNIST.train, 1000, 100 )
+   koTriplet.MSaveModel( )
+   #koTriplet.MComputeAccuracy( koMNIST.test.images, koMNIST.test.labels )
 
-   koOut = koTriplet.MTest( koMNIST.test.images )
+   koOut = koTriplet.MTestModel( koMNIST.test.images )
    koOut = koOut.reshape( [ -1, 2 ] ) 
-
    visualize( koOut, koLabels )
 
 if __name__ == "__main__":     

@@ -1,0 +1,2 @@
+model_checkpoint_path: "TripletEE"
+all_model_checkpoint_paths: "TripletEE"

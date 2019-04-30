@@ -1,5 +1,7 @@
+import os
 import tensorflow as voTF
 import numpy as voNP
+from keras.utils import to_categorical
 from sklearn.utils import shuffle as voShuffle
 from Activation import TeActivation
 from Pool import TePool
@@ -7,57 +9,54 @@ from Pool import TePool
 class TcTriplet( object ) :
    def __init__( aorSelf ) :
       # Set up place holders for inputs
-      aorSelf.voInRef = voTF.placeholder( voTF.float32, [ None, 784 ], name = 'InRef' )  # Ref image input
+      aorSelf.voInRef = voTF.placeholder( voTF.float32, [ None, 784 ], name = 'InRef' ) # Ref image input
       aorSelf.voInPos = voTF.placeholder( voTF.float32, [ None, 784 ], name = 'InPos' ) # Same image input
       aorSelf.voInNeg = voTF.placeholder( voTF.float32, [ None, 784 ], name = 'InNeg' ) # Diff image input
 
       # Set up place holders for labels
-      aorSelf.voY = voTF.placeholder( voTF.float32, [ None, 10 ], name = 'voY' )
+      aorSelf.voY = voTF.placeholder( voTF.float32, [ None, ], name = 'voY' )
+      aorSelf.voYo = voTF.placeholder( voTF.float32, [ None, 10 ], name = 'YOneHot' )
 
-      # Setup the Outputs, Loss Function, and Training Optimizer
-      aorSelf.voOutRef, aorSelf.voOutPos, aorSelf.voOutNeg = aorSelf.MSetupTriplet( )
-      aorSelf.vdLoss = aorSelf.MLoss( aorSelf.voOutRef, aorSelf.voOutPos, aorSelf.voOutNeg )
-      aorSelf.voOptimizer = aorSelf.MInitOptimizer( )
+      # Setup the Outputs, Loss Function, and Training MNetworkTriplet
+      aorSelf.voOutRef, aorSelf.voOutPos, aorSelf.voOutNeg = aorSelf.MNetworkTriplet( )
+      aorSelf.voOutput = aorSelf.MNetworkClassifier( )
+      aorSelf.vdLossTriplet = aorSelf.MLossTriplet( aorSelf.voOutRef, aorSelf.voOutPos, aorSelf.voOutNeg )
+      aorSelf.vdLossCrossE  = aorSelf.MLossCrossEntropy( )
+      aorSelf.voOptimizerTriplet = aorSelf.MOptimizerTriplet( )
+      aorSelf.voOptimizerCrossE  = aorSelf.MOptimizerCrossE( )
       aorSelf.voSaver = voTF.train.Saver( )
 
       # Initialize TensorFlow session
       aorSelf.voSession = voTF.Session( )
       aorSelf.voSession.run( voTF.global_variables_initializer( ) )
 
-   def MSetupTriplet( aorSelf ) :
-      with voTF.variable_scope( "triplet" ) as koScope :
-         koOutRef = aorSelf.MSetupNetwork( aorSelf.voInRef )
-         
-         # Share weights
-         koScope.reuse_variables( )
-         koOutPos = aorSelf.MSetupNetwork( aorSelf.voInPos )
+   def MLayerD( aorSelf, aoX, aoShape, aeActivation, aoVarName, abTrainable = True ) :
+      # Initialize weights and bias
+      koW = voTF.get_variable( name = aoVarName + '_W', 
+                               dtype = voTF.float32, 
+                               shape = aoShape,
+                               initializer = voTF.random_normal_initializer( mean = 0, stddev = 0.01 ),
+                               trainable = abTrainable )
+      koB = voTF.get_variable( name = aoVarName + '_B', 
+                               dtype = voTF.float32, 
+                               shape = [ aoShape[ 1 ] ],
+                               initializer = voTF.random_normal_initializer( mean = 0, stddev = 0.01 ),
+                               trainable = abTrainable )
 
-         # Share weights
-         koScope.reuse_variables( )
-         koOutNeg = aorSelf.MSetupNetwork( aorSelf.voInNeg )
+      # Apply weights and bias to input
+      koY = voTF.add( voTF.matmul( aoX, koW ), koB )
 
-      return( koOutRef, koOutPos, koOutNeg )
+      # Apply activation function
+      if( aeActivation == TeActivation.XeSigmoid ) :
+         koY = voTF.nn.sigmoid( koY )
+      elif( aeActivation == TeActivation.XeRELU ) :
+         koY = voTF.nn.relu( koY )
+      elif( aeActivation == TeActivation.XeSoftMax ) :
+         koY = voTF.nn.softmax( koY )
 
-   def MSetupNetwork( aorSelf, aoInput, abTrainable = True ) :
-      # Reshape the input
-      koX = voTF.reshape( aoInput, [ -1, 28, 28, 1 ] )
+      return( koY )
 
-      # Setup Convolutional Layers
-      koLC1 = aorSelf.MLayerC( koX,   [  1,   32 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC1' )
-      koLC2 = aorSelf.MLayerC( koLC1, [ 32,   64 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC2' )
-      koLC3 = aorSelf.MLayerC( koLC2, [ 64,  128 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC3' )
-
-      # Flatten the output
-      #koFlat = voTF.reshape( koLC2, [ -1, 7 * 7 * 64 ] )
-      koFlat = voTF.reshape( koLC3, [ -1, 4 * 4 * 128 ] )
-
-      # Setup Dense Layers
-      koLD1 = aorSelf.MLayerD( koFlat, [ koFlat.get_shape( )[ 1 ], 10 ], TeActivation.XeSoftMax, 'LD1' )
-      #koLD2 = aorSelf.MLayerD( koLD1,  [ 100, 10 ], TeActivation.XeSoftMax, 'LD2' )
-
-      return( koLD1 )
-
-   def MLayerC( aorSelf, aoX, aoShapeLayer, aoShapeKernel, aoShapePool, aeActivation, aePool, aoVarName ) :
+   def MLayerC( aorSelf, aoX, aoShapeLayer, aoShapeKernel, aoShapePool, aeActivation, aePool, aoVarName, abTrainable = True ) :
       # Setup Shapes: Kernel Rows           Kernel Cols         Input              Num Kernels
       koShapeKernel = [ aoShapeKernel[ 0 ], aoShapeKernel[ 1 ], aoShapeLayer[ 0 ], aoShapeLayer[ 1 ] ]
 
@@ -66,12 +65,12 @@ class TcTriplet( object ) :
                               dtype = voTF.float32,
                               shape = koShapeKernel,
                               initializer = voTF.random_normal_initializer( mean = 0, stddev = 0.01 ),
-                              trainable = True )
+                              trainable = abTrainable )
       koB = voTF.get_variable( name = aoVarName + '_B',
                               dtype = voTF.float32,
                               shape = aoShapeLayer[ 1 ],
                               initializer = voTF.random_normal_initializer( mean = 0, stddev = 0.01 ),
-                              trainable = True )
+                              trainable = abTrainable )
 
       # Perform Convolution
       koY = voTF.nn.conv2d( aoX, koW, [ 1, 1, 1, 1 ], padding = 'SAME' )
@@ -95,82 +94,104 @@ class TcTriplet( object ) :
 
       return( koY )
 
-   def MLayerD( aorSelf, aoX, aoShape, aeActivation, aoVarName ) :
-      # Initialize weights and bias
-      koW = voTF.get_variable( name = aoVarName + '_W', 
-                               dtype = voTF.float32, 
-                               shape = aoShape,
-                               initializer = voTF.random_normal_initializer( mean = 0, stddev = 0.01 ),
-                               trainable = True )
-      koB = voTF.get_variable( name = aoVarName + '_B', 
-                               dtype = voTF.float32, 
-                               shape = [ aoShape[ 1 ] ],
-                               initializer = voTF.random_normal_initializer( mean = 0, stddev = 0.01 ),
-                               trainable = True )
+   def MCNN( aorSelf, aoInput, abTrainable = True ) :
+      # Reshape the input
+      koX = voTF.reshape( aoInput, [ -1, 28, 28, 1 ] )
 
-      # Apply weights and bias to input
-      koY = voTF.add( voTF.matmul( aoX, koW ), koB )
+      # Setup Convolutional Layers
+      koLC1 = aorSelf.MLayerC( koX,   [  1,   32 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC1' )
+      koLC2 = aorSelf.MLayerC( koLC1, [ 32,   64 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC2' )
+      koLC3 = aorSelf.MLayerC( koLC2, [ 64,  128 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeNone, TePool.XeMax, 'LC3' )
 
-      # Apply activation function
-      if( aeActivation == TeActivation.XeSigmoid ) :
-         koY = voTF.nn.sigmoid( koY )
-      elif( aeActivation == TeActivation.XeRELU ) :
-         koY = voTF.nn.relu( koY )
-      elif( aeActivation == TeActivation.XeSoftMax ) :
-         koY = voTF.nn.softmax( koY )
+      # Flatten the output
+      #koFlat = voTF.reshape( koLC2, [ -1, 7 * 7 * 64 ] )
+      koFlat = voTF.reshape( koLC3, [ -1, 4 * 4 * 128 ] )
 
-      return( koY )
+      return( koFlat )
 
-   def MLoss( aorSelf, aoX, aoXp, aoXn, adMargin = 0.1 ) :
+   def MNetworkTriplet( aorSelf ) :
+      with voTF.variable_scope( "triplet" ) as koScope :
+         koOutRef = aorSelf.MCNN( aorSelf.voInRef )
+         
+         # Share weights
+         koScope.reuse_variables( )
+         koOutPos = aorSelf.MCNN( aorSelf.voInPos )
+
+         # Share weights
+         #koScope.reuse_variables( )
+         koOutNeg = aorSelf.MCNN( aorSelf.voInNeg )
+
+      return( koOutRef, koOutPos, koOutNeg )
+
+   def MNetworkClassifier( aorSelf ) :
+      # Initialize Neural Network
+      with voTF.variable_scope( "triplet", reuse = voTF.AUTO_REUSE ) as koScope :
+         koCNN = aorSelf.MCNN( aorSelf.voInRef, abTrainable = False )
+         koA1  = voTF.nn.relu( koCNN )
+
+         # Setup Dense Layers
+         koLD1 = aorSelf.MLayerD( koA1, [ koA1.get_shape( )[ 1 ], 100 ], TeActivation.XeSoftMax, 'LD1' )
+         koLD2 = aorSelf.MLayerD( koLD1,  [ 100, 10 ], TeActivation.XeNone, 'LD2' )
+
+      return( koLD2 )
+
+   def MLossTriplet( aorSelf, aoX, aoXp, aoXn, adMargin = 0.2 ) :
       with voTF.variable_scope( "triplet" ) as koScope :
          koDp2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( aoX, aoXp ) ), 1 )
          koDn2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( aoX, aoXn ) ), 1 )
 
          koLoss = voTF.maximum( 0.0, voTF.math.add( voTF.math.subtract( koDp2, koDn2 ), adMargin ) )
 
-      return( voTF.reduce_mean( koLoss ), voTF.reduce_mean( koDp2 ), voTF.reduce_mean( koDn2 ) )
-         #koNp = aorSelf.MEuclideanDistance( aoX, aoXp )
-         #koNn = aorSelf.MEuclideanDistance( aoX, aoXn )
-         #
-         #koEp = voTF.math.exp( koNp )
-         #koEn = voTF.math.exp( koNn )
-         #
-         #koDp = voTF.math.divide( koEp, voTF.math.add( koEp, koEn ) )
-         #koDn = voTF.math.divide( koEn, voTF.math.add( koEp, koEn ) )
-         #
-         #koLoss = voTF.math.divide( koDp, koDn )
+      return( voTF.reduce_mean( koLoss ) ) #, voTF.reduce_mean( koDp2 ), voTF.reduce_mean( koDn2 ) )
 
-         # koDp2 = voTF.square( aorSelf.MEuclideanDistance( aoX, aoXp ) )
-         # koDn2 = voTF.square( aorSelf.MEuclideanDistance( aoX, aoXn ) )
-         
-         # koLoss = voTF.math.divide( koDp2, voTF.subtract( koDn2, adMargin ) )
-         # voTF.maximum( 0.0, voTF.add( voTF.subtract( koDp2, koDn2 ), adMargin ) )
-         
+   def MLossCrossEntropy( aorSelf ) :
+      koLabels = aorSelf.voYo
+      koLoss = voTF.reduce_mean( voTF.nn.softmax_cross_entropy_with_logits( logits = aorSelf.voOutput, labels = koLabels ) )
+      return( koLoss )
 
-      #return( voTF.reduce_mean( koLoss ), voTF.reduce_mean( koDp ), voTF.reduce_mean( koDn ) )
-      #return( voTF.reduce_mean( koLoss ), voTF.reduce_mean( koDp2 ), voTF.reduce_mean( koDn2 ) )
- 
-   def MEuclideanDistance( aorSelf, aoX, aoY ) :
-      koD = voTF.square( voTF.subtract( aoX, aoY ) )
-      koD = voTF.sqrt( voTF.reduce_sum( koD ) )
-      return( koD )
-
-   def MInitOptimizer( aorSelf ) :
-      kdLR = 0.1
+   def MOptimizerTriplet( aorSelf ) :
+      kdLR = 0.01
       kdRng = 0
       voTF.set_random_seed( kdRng )
-      koOptimizer = voTF.train.GradientDescentOptimizer( kdLR ).minimize( aorSelf.vdLoss[ 0 ] )
+      koOptimizer = voTF.train.GradientDescentOptimizer( kdLR ).minimize( aorSelf.vdLossTriplet )
       return( koOptimizer )
 
-   def MTrain( aorSelf, aoX, aoY, aiEpochs, aiBatchSize = 100 ) :
+   def MOptimizerCrossE( aorSelf ) :
+      kdLR = 0.01
+      kdRng = 0
+      voTF.set_random_seed( kdRng )
+      koOptimizer = voTF.train.AdamOptimizer( kdLR ).minimize( aorSelf.vdLossCrossE )
+      return( koOptimizer )
+
+   def MTrainModel( aorSelf, aoX, aoY, aiEpochs, aiBatchSize = 100 ) :
       for kiEpoch in range( aiEpochs ) :
+         kdLoss = 0.0
          koInRef, koInPos, koInNeg = aorSelf.MGetTriplets( aoX, aoY, 10000 )
          for kiI in range( 0, int( len( koInRef ) ), aiBatchSize ) :            
-            _, kdLoss = aorSelf.voSession.run( [ aorSelf.voOptimizer, aorSelf.vdLoss ],
-                                               feed_dict = { aorSelf.voInRef: koInRef[ kiI : kiI + aiBatchSize ], 
-                                                             aorSelf.voInPos: koInPos[ kiI : kiI + aiBatchSize ], 
-                                                             aorSelf.voInNeg: koInNeg[ kiI : kiI + aiBatchSize ] } )
-         print( 'Loss: %.3f' % ( kdLoss[ 0 ] ) )
+            _, kdL = aorSelf.voSession.run( [ aorSelf.voOptimizerTriplet, aorSelf.vdLossTriplet ],
+                                            feed_dict = { aorSelf.voInRef: koInRef[ kiI : kiI + aiBatchSize ], 
+                                                          aorSelf.voInPos: koInPos[ kiI : kiI + aiBatchSize ], 
+                                                          aorSelf.voInNeg: koInNeg[ kiI : kiI + aiBatchSize ] } )
+            kdLoss = kdLoss + kdL
+         print( 'Loss: %.3f' % ( kdLoss ) )
+
+   def MTrainClassifier( aorSelf, aoData, aiEpochs, aiBatchSize = 100 ) :
+      for kiEpoch in range( aiEpochs ) :
+         koX, koY = aoData.next_batch( aiBatchSize )
+         koYc = to_categorical( koY ) # Convert labels to one hot
+         koLabels = voNP.zeros( aiBatchSize )
+         _, kdLoss = aorSelf.voSession.run( [ aorSelf.voOptimizerCrossE, aorSelf.vdLossCrossE ],
+                                            feed_dict = { aorSelf.voInRef: koX,
+                                                          aorSelf.voInPos: koX,
+                                                          aorSelf.voInNeg: koX,
+                                                          aorSelf.voYo: koYc,
+                                                          aorSelf.voY: koLabels } )
+         if( kiEpoch % 10 == 0 ) :
+            print( 'Epoch %d: Train Loss: %.3f' % ( kiEpoch, kdLoss ) )
+
+   def MTestModel( aorSelf, aoX ) :
+      koY = aorSelf.voSession.run( aorSelf.voOutRef, feed_dict = { aorSelf.voInRef: aoX } )         
+      return koY 
 
    def MGetTriplets( aorSelf, aoX, aoY, aiSize ) :
       # Randomize inputs
@@ -197,29 +218,42 @@ class TcTriplet( object ) :
          koPos[ kiI ] = aoX[ kiIp[ 1 ] ]
          koNeg[ kiI ] = aoX[ kiIn[ 0 ] ]
 
-         ## Store the current element as the reference / anchor
-         #koRef[ kiI ] = aoX[ kiI ]
-         #
-         ## Get the label of the current element
-         #koLabel = aoY[ kiI ]
-         #
-         ## Get list of indeces for positives and negatives
-         #kiIp = voNP.where( aoY == koLabel )[ 0 ]
-         #kiIn = voNP.where( aoY != koLabel )[ 0 ]
-         #
-         ## Randomize the choice
-         #voNP.random.shuffle( kiIp )
-         #voNP.random.shuffle( kiIn )
-         #
-         #if( kiIp[ 0 ] != kiI ) :
-         #   koPos[ kiI ] = aoX[ kiIp[ 0 ] ]
-         #else :
-         #   koPos[ kiI ] = aoX[ kiIp[ 1 ] ]
-         #
-         #koNeg[ kiI ] = aoX[ kiIn[ 0 ] ]
-
       return( koRef, koPos, koNeg )
 
-   def MTest( aorSelf, aoX ) :
-      koY = aorSelf.voSession.run( aorSelf.voOutRef, feed_dict = { aorSelf.voInRef: aoX } )         
-      return koY 
+   def MComputeAccuracy( aorSelf, aoX, aoY ):         
+      koLabels = voNP.zeros( 100 )         
+      koYOneHot = voNP.zeros( ( 100, 10 ) )         
+      koA = aorSelf.voSession.run( aorSelf.voOutput, feed_dict = { aorSelf.voInRef: aoX,
+                                                                   aorSelf.voInPos: aoX,
+                                                                   aorSelf.voInNeg: aoX,
+                                                                   aorSelf.voYo: koYOneHot,
+                                                                   aorSelf.voY: koLabels } )         
+      kdAccuracyCount = 0         
+      koTestY = to_categorical( aoY )  
+      
+      # one hot labels         
+      for kiI in range( koTestY.shape[ 0 ] ) :             
+         # determine index of maximum output value             
+         kiMax = koA[ kiI ].argmax( axis = 0 )                               
+         if( koTestY[ kiI, kiMax ] == 1 ):                 
+            kdAccuracyCount = kdAccuracyCount + 1                   
+      print( "Accuracy count = " + str( kdAccuracyCount / koTestY.shape[ 0 ] * 100 ) + '%' ) 
+
+
+   def MSaveModel( aorSelf ):         
+      koDir = "./TrainedModels/"         
+      koName = "TripletEE"         
+      if not os.path.exists( koDir ):             
+         os.makedirs( koDir )         
+      # Save the latest trained models         
+      aorSelf.voSaver.save( aorSelf.voSession, koDir + koName )  
+ 
+   def MLoadModel( aorSelf ):         
+      # restore the trained model         
+      koDir = "./TrainedModels/"         
+      koName = "TripletEE"            
+      try:
+         aorSelf.voSaver.restore( aorSelf.voSession, koDir + koName )
+      except:
+         print( 'Model not trained.' )
+
