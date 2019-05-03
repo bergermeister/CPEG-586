@@ -140,21 +140,30 @@ class TcTriplet( object ) :
 
    def MLossTriplet( aorSelf ) :
       with voTF.variable_scope( "triplet" ) as koScope :
-         kdMargin = 0.2
-         koX = aorSelf.voOutRef
+         kdMargin = 1
+         koX  = aorSelf.voOutRef
          koXp = aorSelf.voOutPos
          koXn = aorSelf.voOutNeg
 
-         koDp2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXp ) ), 1 )
-         koDn2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXn ) ), 1 )
+         # Calculate the distances between X+ and X- against the reference X
+         koNp = voTF.sqrt( voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXp ) ) ) )  # || Net(x) - Net(x+) ||
+         koNn = voTF.sqrt( voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXn ) ) ) )  # || Net(x) - Net(x-) ||
 
-         #koDp2 = voTF.nn.softmax( koDp2 )
-         #koDn2 = voTF.nn.softmax( koDn2 )
+         # Calculate the terms needed to calculate Dp and Dn
+         koEp = voTF.exp( koNp )                                  # e ^ || Net(x) - Net(x+) ||
+         koEn = voTF.exp( koNn )                                  # e ^ || Net(x) - Net(x-) ||
+         koEt = voTF.maximum( 1e-6, voTF.math.add( koEp, koEn ) ) # ( e ^ || Net(x) - Net(x+) || ) + ( e ^ || Net(x) - Net(x-) || )
 
-         #koLoss = voTF.math.divide( voTF.math.add( koDp2, adMargin ), voTF.math.add( koDn2, 1e-6 ) )
-         koLoss = voTF.maximum( 0.0, voTF.math.add( voTF.math.subtract( koDp2, koDn2 ), kdMargin ) )
+         # Calculate Dp and Dn
+         koDp = voTF.math.divide( koEp, koEt )  
+         koDn = voTF.math.divide( koEn, koEt )
 
-      return( voTF.reduce_mean( koLoss ) ) #, voTF.reduce_mean( koDp2 ), voTF.reduce_mean( koDn2 ) )
+         # Calculate Loss = ||(Dp, Dn - 1)||^2 = Dp^2 + (Dn - 1)^2
+         koLoss = voTF.math.add( voTF.square( koDp ), voTF.square( voTF.subtract( koDn, kdMargin ) ) )
+         #koLoss = voTF.maximum( 0.0, voTF.math.add( voTF.math.subtract( koDp2, koDn2 ), kdMargin ) )
+
+      return( koLoss )
+      #return( voTF.reduce_mean( koLoss ) )
 
    def MLossCrossEntropy( aorSelf ) :
       koLabels = aorSelf.voYo
@@ -162,7 +171,7 @@ class TcTriplet( object ) :
       return( koLoss )
 
    def MOptimizerTriplet( aorSelf ) :
-      kdLR = 0.1
+      kdLR = 0.01
       kdRng = 0
       voTF.set_random_seed( kdRng )
       koOptimizer = voTF.train.GradientDescentOptimizer( kdLR ).minimize( aorSelf.vdLossTriplet )
@@ -189,10 +198,11 @@ class TcTriplet( object ) :
                                                          aorSelf.voInPos: koInPos,
                                                          aorSelf.voInNeg: koInNeg } )
          kdLoss = kdLoss + kdL
-         aorSelf.MSaveModel( )
-         print( 'Loss: %.3f' % ( kdLoss ) )
+         print( 'Loss: %.6f' % ( kdLoss ) )
+      aorSelf.MSaveModel( )
       koWriter = voTF.summary.FileWriter( "SummaryTrainingModel", aorSelf.voSession.graph )         
       koWriter.close()   
+      
 
    def MTrainClassifier( aorSelf, aoData, aiEpochs, aiBatchSize = 100 ) :
       for kiEpoch in range( aiEpochs ) :

@@ -25,13 +25,13 @@ def main( ) :
 
    koTriplet = TcTriplet( )
    koTriplet.MLoadModel( )
-   koTriplet.MTrainModel( koMNIST.train.images, koMNIST.train.labels, 100, 100 )
+   koTriplet.MTrainModel( koMNIST.train.images, koMNIST.train.labels, 600000, 1 )
    #koTriplet.MTrainClassifier( koMNIST.train, 1000, 100 )
    #koTriplet.MComputeAccuracy( koMNIST.test.images, koMNIST.test.labels )
 
-   #koOut = koTriplet.MTestModel( koMNIST.test.images )
-   #koOut = koOut.reshape( [ -1, 2 ] ) 
-   #visualize( koOut, koLabels )
+   koOut = koTriplet.MTestModel( koMNIST.test.images )
+   koOut = koOut.reshape( [ -1, 2 ] ) 
+   visualize( koOut, koLabels )
 
 if __name__ == "__main__":     
    main( )
