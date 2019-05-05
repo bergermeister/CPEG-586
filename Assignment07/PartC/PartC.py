@@ -24,10 +24,10 @@ def main( ) :
    koLabels = koMNIST.test.labels
 
    koTriplet = TcTriplet( )
-   koTriplet.MLoadModel( )
-   koTriplet.MTrainModel( koMNIST.train.images, koMNIST.train.labels, 600000, 1 )
-   #koTriplet.MTrainClassifier( koMNIST.train, 1000, 100 )
-   #koTriplet.MComputeAccuracy( koMNIST.test.images, koMNIST.test.labels )
+   #koTriplet.MLoadModel( )
+   #koTriplet.MTrainModel( koMNIST.train.images, koMNIST.train.labels, 160000, 1 )
+   koTriplet.MTrainClassifier( koMNIST.train, 1000, 100 )
+   koTriplet.MComputeAccuracy( koMNIST.test.images, koMNIST.test.labels )
 
    koOut = koTriplet.MTestModel( koMNIST.test.images )
    koOut = koOut.reshape( [ -1, 2 ] ) 
