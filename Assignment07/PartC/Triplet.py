@@ -97,21 +97,14 @@ class TcTriplet( object ) :
    def MCNN( aorSelf, aoInput, abTrainable = True ) :
       # Reshape the input
       koX = voTF.reshape( aoInput, [ -1, 28, 28, 1 ] )
-
+      
       # Setup Convolutional Layers
       koLC1 = aorSelf.MLayerC( koX,   [  1,   32 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC1' )
       koLC2 = aorSelf.MLayerC( koLC1, [ 32,   64 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeRELU, TePool.XeMax, 'LC2' )
       koLC3 = aorSelf.MLayerC( koLC2, [ 64,  128 ], [ 5, 5 ], [ 2, 2 ], TeActivation.XeNone, TePool.XeMax, 'LC3' )
-
+      
       # Flatten the output
-      #koFlat = voTF.reshape( koLC2, [ -1, 7 * 7 * 64 ] )
       koFlat = voTF.reshape( koLC3, [ -1, 4 * 4 * 128 ] )
-
-      #koX = aoInput
-      #koLE1 = aorSelf.MLayerD( koX,   [ 784, 500 ], TeActivation.XeRELU, 'LE1', abTrainable )
-      #koLE2 = aorSelf.MLayerD( koLE1, [ 500, 250 ], TeActivation.XeRELU, 'LE2', abTrainable )
-      #koLE3 = aorSelf.MLayerD( koLE2, [ 250, 128 ], TeActivation.XeNone, 'LE3', abTrainable )
-      #koFlat = koLE3
 
       return( koFlat )
 
@@ -129,8 +122,8 @@ class TcTriplet( object ) :
    def MNetworkClassifier( aorSelf ) :
       # Initialize Neural Network
       with voTF.variable_scope( "triplet", reuse = voTF.AUTO_REUSE ) as koScope :
-         koCNN = aorSelf.MCNN( aorSelf.voInRef, abTrainable = False )
-         koA1  = voTF.nn.relu( koCNN )
+         koA1 = aorSelf.MCNN( aorSelf.voInRef, abTrainable = False )
+         koA1  = voTF.nn.relu( koA1 )
 
          # Setup Dense Layers
          koLD1 = aorSelf.MLayerD( koA1, [ koA1.get_shape( )[ 1 ], 100 ], TeActivation.XeRELU, 'LD1' )
@@ -140,21 +133,28 @@ class TcTriplet( object ) :
 
    def MLossTriplet( aorSelf ) :
       with voTF.variable_scope( "triplet" ) as koScope :
-         kdMargin = 0.2
-         koX = aorSelf.voOutRef
+         kdMargin = 1.0
+         koX  = aorSelf.voOutRef
          koXp = aorSelf.voOutPos
          koXn = aorSelf.voOutNeg
 
-         koDp2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXp ) ), 1 )
-         koDn2 = voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXn ) ), 1 )
+         # Calculate the distances between X+ and X- against the reference X
+         koNp = voTF.sqrt( voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXp ) ), 1 ) )  # || Net(x) - Net(x+) ||
+         koNn = voTF.sqrt( voTF.reduce_sum( voTF.square( voTF.math.subtract( koX, koXn ) ), 1 ) )  # || Net(x) - Net(x-) ||
 
-         #koDp2 = voTF.nn.softmax( koDp2 )
-         #koDn2 = voTF.nn.softmax( koDn2 )
+         # Calculate the terms needed to calculate Dp and Dn
+         koEp = voTF.exp( koNp )                                  # e ^ || Net(x) - Net(x+) ||
+         koEn = voTF.exp( koNn )                                  # e ^ || Net(x) - Net(x-) ||
+         koEt = voTF.maximum( 1e-6, voTF.math.add( koEp, koEn ) ) # ( e ^ || Net(x) - Net(x+) || ) + ( e ^ || Net(x) - Net(x-) || )
 
-         #koLoss = voTF.math.divide( voTF.math.add( koDp2, adMargin ), voTF.math.add( koDn2, 1e-6 ) )
-         koLoss = voTF.maximum( 0.0, voTF.math.add( voTF.math.subtract( koDp2, koDn2 ), kdMargin ) )
+         # Calculate Dp and Dn
+         koDp = voTF.math.divide( koEp, koEt )  
+         koDn = voTF.math.divide( koEn, koEt )
 
-      return( voTF.reduce_mean( koLoss ) ) #, voTF.reduce_mean( koDp2 ), voTF.reduce_mean( koDn2 ) )
+         # Calculate Loss = ||(Dp, Dn - 1)||^2 = Dp^2 + (Dn - 1)^2
+         koLoss = voTF.math.add( voTF.square( koDp ), voTF.square( voTF.subtract( koDn, kdMargin ) ) )
+
+      return( voTF.reduce_mean( koLoss ) )
 
    def MLossCrossEntropy( aorSelf ) :
       koLabels = aorSelf.voYo
@@ -182,17 +182,20 @@ class TcTriplet( object ) :
          if( ( kiI + aiBatchSize ) > aoX.shape[ 0 ] ) :
             kiI = 0
          kdLoss = 0.0
-         koInRef = koX[ kiI : kiI + aiBatchSize ]
-         koInPos, koInNeg = aorSelf.MGetTriplets( koX, koY, kiI, aiBatchSize )
+         koInRef, koInPos, koInNeg = aorSelf.MGetTriplets( koX, koY, kiI, aiBatchSize )
          _, kdL = aorSelf.voSession.run( [ aorSelf.voOptimizerTriplet, aorSelf.vdLossTriplet ],
                                           feed_dict = { aorSelf.voInRef: koInRef,
                                                          aorSelf.voInPos: koInPos,
                                                          aorSelf.voInNeg: koInNeg } )
          kdLoss = kdLoss + kdL
-         aorSelf.MSaveModel( )
-         print( 'Loss: %.3f' % ( kdLoss ) )
+         if( ( kiEpoch % 50 ) == 0 ) :
+            kdDp = ( ( koInRef - koInPos ) ** 2 ).sum( )
+            kdDn = ( ( koInRef - koInNeg ) ** 2 ).sum( )
+            print( 'Iteration: %d      Loss: %.6f   Dp: %.6f   Dn: %.6f' % ( kiEpoch, kdLoss, kdDp, kdDn ) )
+      aorSelf.MSaveModel( )
       koWriter = voTF.summary.FileWriter( "SummaryTrainingModel", aorSelf.voSession.graph )         
       koWriter.close()   
+      
 
    def MTrainClassifier( aorSelf, aoData, aiEpochs, aiBatchSize = 100 ) :
       for kiEpoch in range( aiEpochs ) :
@@ -207,7 +210,7 @@ class TcTriplet( object ) :
                                                           aorSelf.voY: koLabels } )
          if( kiEpoch % 10 == 0 ) :
             print( 'Epoch %d: Train Loss: %.3f' % ( kiEpoch, kdLoss ) )
-      aorSelf.MSaveModel( )
+      #aorSelf.MSaveModel( )
       koWriter = voTF.summary.FileWriter( "SummaryTrainingClassifier", aorSelf.voSession.graph )         
       koWriter.close()   
 
@@ -217,6 +220,7 @@ class TcTriplet( object ) :
 
    def MGetTriplets( aorSelf, aoX, aoY, aiI, aiSize ) :
       # Create Reference, Positive, and Negative arrays
+      koRef = aoX[ aiI : aiI + aiSize ] # voNP.zeros( shape = ( aiSize, aoX.shape[ 1 ] ), dtype = 'float32' )
       koPos = voNP.zeros( shape = ( aiSize, aoX.shape[ 1 ] ), dtype = 'float32' )
       koNeg = voNP.zeros( shape = ( aiSize, aoX.shape[ 1 ] ), dtype = 'float32' )
       for kiB in range( aiSize ) :
@@ -234,7 +238,7 @@ class TcTriplet( object ) :
             koPos[ kiB ] = aoX[ kiIp[ 1 ] ]
          koNeg[ kiB ] = aoX[ kiIn[ 0 ] ]
 
-      return( koPos, koNeg )
+      return( koRef, koPos, koNeg )
 
    def MComputeAccuracy( aorSelf, aoX, aoY ):         
       koLabels = voNP.zeros( 100 )         
