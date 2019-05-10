@@ -1,5 +1,6 @@
 import concurrent.futures
 import numpy as voNP
+import copy
 from sklearn.utils import shuffle as voShuffle
 from multiprocessing import Pool, freeze_support, cpu_count
 from TcMatrix import TcMatrix
@@ -74,11 +75,13 @@ class TcCNNSiamese( object ) :
 
          for kiI in range( 0, len( kdX1 ), aiBatchSize ) :
             # Pack the Intp
-            koArgs = [ ( kdX1[ kiI + kiB ], kdX2[ kiI + kiB ], kdY1[ kiI + kiB ] != kdY2[ kiI + kiB ] ) for kiB in range( aiBatchSize ) ]
+            koArgs = [ ( kdX1[ kiI + kiB ], kdX2[ kiI + kiB ], voNP.argmax( kdY1[ kiI + kiB ] ) != voNP.argmax( kdY2[ kiI + kiB ] ) ) for kiB in range( aiBatchSize ) ]
             
             # Execute batch in parallel
-            #koRes = koPool.map( aorSelf.MLoopModel, koArgs )
-            koRes = aorSelf.MLoopModel( koArgs[ 0 ] )
+            koRes = koPool.map( aorSelf.MLoopModel, koArgs )
+            #koRes = [ ]
+            #for kiB in range( aiBatchSize ) :
+            #   koRes.append( aorSelf.MLoopModel( koArgs[ kiB ] ) )
 
             # Accumulate Error
             for koCNN in koRes :
@@ -90,10 +93,10 @@ class TcCNNSiamese( object ) :
             # Clear gradients
             aorSelf.MClearGradients( )
 
-         if( ( kiEpoch % 10 ) == 0 ) :
+         if( ( kiE % 10 ) == 0 ) :
             adLR /= 2.0 # Reduce Learning Rate
 
-         print( "Epoch: ", kiEpoch, " Error: ",  kdError )
+         print( "Epoch: ", kiE, " Error: ",  kdError )
 
    def MTrainClassifier( aorSelf, adX, adY, aiEpochs, adLR, aiBatchSize ) :
       freeze_support( )
@@ -115,7 +118,7 @@ class TcCNNSiamese( object ) :
 
             # Accumulate Error
             for koCNN in koRes :
-               kdError += koCNN.vdLoss
+               kdError += koCNN.vdLossCross
 
             # Update Kernel Weights and Biases
             aorSelf.MBackPropagateClassifier( adLR, koRes )
@@ -133,7 +136,7 @@ class TcCNNSiamese( object ) :
       kdX2 = aoArgs[ 1 ] # Parse Input 2
       kdY  = aoArgs[ 2 ] # Parse Expected Output 
 
-      kdMargin = 0.2
+      kdMargin = 5.0 #0.2
 
       # Build Input Matrices
       koX1 = TcMatrix( kdX1.shape[ 0 ], kdX1.shape[ 1 ] )
@@ -141,20 +144,44 @@ class TcCNNSiamese( object ) :
       koX2 = TcMatrix( kdX2.shape[ 0 ], kdX2.shape[ 1 ] )
       koX2.vdData = kdX2
 
-      # Run Forward Pass 
+      # Run Forward Pass for CNN with Input X1 and copy the results
       kdA1 = aorSelf.MNetworkModel( koX1 )
+      koN1 = copy.deepcopy( aorSelf )
+
+      # Run Forward Pass for CNN with Input X2 and copy the results
       kdA2 = aorSelf.MNetworkModel( koX2 )
+      koN2 = copy.deepcopy( aorSelf )
 
       # Calculate the contrastive loss
-      kdD = ( kdA1.vdData - kdA2.vdData ) ** 2       # Euclidean Distance Squared
-      kdDw = voNP.sum( kdD, 1 )
-      kdDw2 = voNP.sqrt( kdDw + 1e-6 )
-      kdLossS = voNP.multiply( 1 - kdY, kdDw2 ** 2 )
-      kdLossD = voNP.maximum( 0, voNP.multiply( kdY, ( kdMargin - kdDw2 ) ** 2 ) )
-      aorSelf.vdLossContr = voNP.mean( kdLossS + kdLossD )
+      kdDw = voNP.sqrt( voNP.maximum( 1e-6, voNP.sum( ( kdA1.vdData - kdA2.vdData ) ** 2 ) ) )
+      kdLs = 0.5 * voNP.multiply( ( 1 - kdY ), ( kdDw ** 2 ) )
+      kdLd = 0.5 * voNP.multiply( kdY, voNP.maximum( 0.0, kdMargin - kdDw ) ** 2 )
+      aorSelf.vdLossContr = voNP.mean( kdLs + kdLd )
+
+      # Calculate Delta and apply derivate of RELU
+      kdD = voNP.sum( ( kdA1.vdData - kdA2.vdData ), 1 )
+      kdD = kdD * voNP.sum( voNP.maximum( 0, kdA1.vdData ) - voNP.maximum( 0, kdA2.vdData ) )
+      if( kdY == True ) :
+         if( kdDw < kdMargin ) :
+            kdD = kdD * -( ( kdMargin - kdDw ) / kdDw )
+         else :
+            kdD = kdD * 0.0
 
       # Update Gradients
-      aorSelf.MUpdateModel( koX1, kdDw2, koY )
+      koN1.MUpdateModel( koX1, kdD, kdY )
+      koN2.MUpdateModel( koX2, kdD, kdY )
+      for kiI in range( len( aorSelf.voLayersC ) ) :
+         koLayer = aorSelf.voLayersC[ kiI ]
+         koL1    = koN1.voLayersC[ kiI ]
+         koL2    = koN2.voLayersC[ kiI ]
+         if( kiI == 0 ) : # First CNN layer
+            for kiQ in range( len( koLayer.voFM ) ) :
+               koLayer.voKernelsG[ 0 ][ kiQ ].vdData = koL1.voKernelsG[ 0 ][ kiQ ].vdData - koL2.voKernelsG[ 0 ][ kiQ ].vdData
+         else : # Intermediate CNN Layers
+            koPrev = aorSelf.voLayersC[ kiI - 1 ]
+            for kiP in range( len( koPrev.voFM ) ) :
+               for kiQ in range( len( koLayer.voFM ) ) :
+                  koLayer.voKernelsG[ kiP ][ kiQ ].vdData = koL1.voKernelsG[ kiP ][ kiQ ].vdData - koL2.voKernelsG[ kiP ][ kiQ ].vdData
 
       return( aorSelf )
 
@@ -167,7 +194,7 @@ class TcCNNSiamese( object ) :
       koX.vdData = kdX
 
       # Run Forward Pass
-      kdA = aorSelf.MForwardPass( koX )
+      kdA = aorSelf.MNetworkClassifier( koX )
 
       # Calculate the loss
       aorSelf.vdLossCross = ( ( kdA - kdY ) ** 2 ).sum( )
@@ -299,7 +326,6 @@ class TcCNNSiamese( object ) :
 
    def MBackPropagateModel( aorSelf, adLR, aoCNN ) :
       kiCountLc = len( aorSelf.voLayersC )   # Number of CNN Layers
-      kiCountLn = len( aorSelf.voLayersN )   # Number of NN Layers
       kiSizeB   = len( aoCNN )               # Batch Size
       
       # Update kernels and weights
@@ -330,6 +356,9 @@ class TcCNNSiamese( object ) :
             koFM.vdBias = koFM.vdBias - ( ( kdGb / kiSizeB ) * adLR )
 
    def MBackPropagateClassifier( aorSelf, adLR, aoCNN ) :
+      kiCountLn = len( aorSelf.voLayersN )   # Number of NN Layers
+      kiSizeB   = len( aoCNN )               # Batch Size
+
       # Update Regular NN Layers
       for kiI in range( kiCountLn ) :
          koLayer = aorSelf.voLayersN[ kiI ]
