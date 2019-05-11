@@ -160,7 +160,7 @@ class TcCNNSiamese( object ) :
 
       # Calculate Delta and apply derivate of RELU
       kdD = voNP.sum( ( kdA1.vdData - kdA2.vdData ), 1 )
-      kdD = kdD * voNP.sum( voNP.maximum( 0, kdA1.vdData ) - voNP.maximum( 0, kdA2.vdData ) )
+      #kdD = kdD * voNP.sum( voNP.maximum( 0, kdA1.vdData ) - voNP.maximum( 0, kdA2.vdData ) )
       if( kdY == True ) :
          if( kdDw < kdMargin ) :
             kdD = kdD * -( ( kdMargin - kdDw ) / kdDw )
