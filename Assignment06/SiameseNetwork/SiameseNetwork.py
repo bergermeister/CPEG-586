@@ -90,7 +90,7 @@ def main( ) :
 
    # Train the CNN
    koCNN.MTrainModel( kdTrainX, kdTrainY, 30, 0.1, kiSizeBatch )
-   koCNN.MTrainClassifier( kdTrainX, kdTrainY, 1000, 0.1, kiSizeBatch )
+   koCNN.MTrainClassifier( kdTrainX, kdTrainY, 50, 0.1, kiSizeBatch )
 
    # Test the CNN
    kdAccuracy = MComputeAccuracy( koCNN, koMNIST + 'Test10000/' )
