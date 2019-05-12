@@ -273,9 +273,9 @@ class TcCNNSiamese( object ) :
 
             # Backpropagate to prev CNN Layer
             for kiP in range( len( koPrev.voFM ) ) :
-               kiWidth = koPrev.voFM[ kiP ].voOutputSS.viRows
-               kiHeight = koPrev.voFM[ kiP ].voOutputSS.viCols
-               koPrev.voFM[ kiP ].voDeltaSS = TcMatrix( kiWidth, kiHeight )
+               kiWidth = koPrev.voFM[ kiP ].voOutputSS.viCols
+               kiHeight = koPrev.voFM[ kiP ].voOutputSS.viRows
+               koPrev.voFM[ kiP ].voDeltaSS = TcMatrix( kiHeight, kiWidth )
                for kiQ in range( len( koLayer.voFM ) ) :
                   koMdss = koPrev.voFM[ kiP ].voDeltaSS.vdData
                   koKernel = koLayer.voKernels[ kiP ][ kiQ ].MRotate90( ).MRotate90( )
