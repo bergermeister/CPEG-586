@@ -37,10 +37,10 @@ def MIsMatch( aoArgs ) :
    koFile = aoArgs[ 2 ]
    kdY = voNP.zeros( ( 40, 1 ) )
    kiY = int( koFile.split( '_' )[ 0 ][ 1: ] )
-   kdY[ kiI ][ kiY - 1 ] = 1.0
+   kdY[ kiY - 1 ] = 1.0
    #kdX = cv2.imread( koPath + '{0}'.format( koFile ), 0 ) / 255.0
    #kiY = int( koFile[ 1 ] )
-   #kdY[ kiI ][ kiY ] = 1.0
+   #kdY[ kiY ] = 1.0
    koX = TcMatrix( kdX.shape[ 0 ], kdX.shape[ 1 ] )
    koX.vdData = kdX
 
@@ -61,7 +61,7 @@ def MComputeAccuracy( aoCNN, aoPath ) :
    kdAccuracy = 0.0
 
    for kiI in range( 0, kdTotal, kiCount ) :
-      koArgs = [ ( aoCNN, aoPath, koFiles[ kiB ] ) for kiB in range( kiCount ) ]
+      koArgs = [ ( aoCNN, aoPath, koFiles[ kiI + kiB ] ) for kiB in range( kiCount ) ]
       koRes = koPool.map( MIsMatch, koArgs )
       kdAccuracy += voNP.sum( koRes )
 
