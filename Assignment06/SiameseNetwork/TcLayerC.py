@@ -9,24 +9,26 @@ from TcMatrix import TcMatrix
 class TcLayerC( object ) :
    def __init__( aorSelf, aorShapeFMap, aorShapeSize, aePool, aeActivation ) :
       # Decode and save the shape information
-      aorSelf.viNumFMThis = aorShapeFMap[ 0 ]   # Number of Feature Maps in this layer
-      aorSelf.viNumFMPrev = aorShapeFMap[ 1 ]   # Number of Feature Maps in previous layer
-      aorSelf.viSizeInput = aorShapeSize[ 0 ]   # Size of inputs
-      aorSelf.viSizeKernl = aorShapeSize[ 1 ]   # Size of Kernel
+      aorSelf.viNumFMThis  = aorShapeFMap[ 0 ]   # Number of Feature Maps in this layer
+      aorSelf.viNumFMPrev  = aorShapeFMap[ 1 ]   # Number of Feature Maps in previous layer
+      aorSelf.viSizeInputW = aorShapeSize[ 0 ]   # Size of input width
+      aorSelf.viSizeInputH = aorShapeSize[ 1 ]   # Size of input height
+      aorSelf.viSizeKernel = aorShapeSize[ 2 ]   # Size of Kernel
 
       # Calculate the size of the Convolution Output: Input - Kernel + 1
-      aorSelf.viConvOutputSize = aorSelf.viSizeInput - aorSelf.viSizeKernl + 1
+      aorSelf.viConvOutputSizeW = aorSelf.viSizeInputW - aorSelf.viSizeKernel + 1
+      aorSelf.viConvOutputSizeH = aorSelf.viSizeInputH - aorSelf.viSizeKernel + 1
 
       # Create Feature Maps
       aorSelf.voFM = [ ]
       for kiI in range( aorSelf.viNumFMThis ) :
-         aorSelf.voFM.append( TcFeatureMap( aorSelf.viConvOutputSize, aePool, aeActivation ) )
+         aorSelf.voFM.append( TcFeatureMap( aePool, aeActivation ) )
 
       # Initialize Convolution Results and Sums matrices
       aorSelf.vdConvResults = voNP.ndarray( shape=( aorSelf.viNumFMPrev, aorSelf.viNumFMThis ), dtype=TcMatrix )
       aorSelf.vdConvolSums  = voNP.ndarray( shape=( aorSelf.viNumFMThis ), dtype=TcMatrix )
       for kiF in range( aorSelf.viNumFMThis ) :
-         koSum = TcMatrix( aorSelf.viConvOutputSize, aorSelf.viConvOutputSize )
+         koSum = TcMatrix( aorSelf.viConvOutputSizeH, aorSelf.viConvOutputSizeW )
          koSum.vdData = voNP.zeros( ( koSum.viRows, koSum.viCols ) )
          aorSelf.vdConvolSums[ kiF ] = koSum
 
@@ -35,10 +37,10 @@ class TcLayerC( object ) :
       aorSelf.voKernelsG = voNP.ndarray( shape=( aorSelf.viNumFMPrev, aorSelf.viNumFMThis ), dtype=TcMatrix )
       for kiP in range( aorSelf.viNumFMPrev ) :       # For each feature map in previous layer
          for kiT in range( aorSelf.viNumFMThis ) :    # For each feature map in this layer
-            koKernel  = TcMatrix( aorSelf.viSizeKernl, aorSelf.viSizeKernl )
+            koKernel  = TcMatrix( aorSelf.viSizeKernel, aorSelf.viSizeKernel )
             koKernel.vdData = voNP.random.uniform( low=-0.1, high=0.1, size=( koKernel.viRows, koKernel.viCols ) )
             aorSelf.voKernels[ kiP ][ kiT ]  = koKernel
-            koKernelG = TcMatrix( aorSelf.viSizeKernl, aorSelf.viSizeKernl )
+            koKernelG = TcMatrix( aorSelf.viSizeKernel, aorSelf.viSizeKernel )
             koKernelG.vdData = voNP.zeros( ( koKernelG.viRows, koKernelG.viCols ) )
             aorSelf.voKernelsG[ kiP ][ kiT ] = koKernelG
 

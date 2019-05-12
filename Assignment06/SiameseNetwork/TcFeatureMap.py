@@ -5,8 +5,7 @@ from TcMatrix import TcMatrix
 
 # Convolutional Neural Network Feature Map
 class TcFeatureMap( object ) :
-   def __init__( aorSelf, aiInputSize, aePool, aeActivation ) :
-      aorSelf.viInputSize  = aiInputSize
+   def __init__( aorSelf, aePool, aeActivation ) :
       aorSelf.vePool       = aePool
       aorSelf.veActivation = aeActivation
       aorSelf.voDeltaSS    = TcMatrix( 1, 1 )

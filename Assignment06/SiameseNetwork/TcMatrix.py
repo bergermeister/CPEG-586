@@ -15,9 +15,12 @@ class TcMatrix( object ) :
    def MClear( aorSelf ) :
       aorSelf.vdData.fill( 0 )
 
-   def MConvolve( aorSelf, aoKernel ) :
+   def MConvolve( aorSelf, aoKernel, aoMode = 'valid' ) :
       # Perform convolution and remove edges
-      koRes = voSP.convolve2d( aorSelf.vdData, aoKernel.vdData, mode='valid' ) #, mode='constant', cval=0.0 )
+      koRes = voSP.convolve2d( aorSelf.vdData, aoKernel.vdData, mode=aoMode ) #, mode='constant', cval=0.0 )
+
+      #if( koRes.shape[ 0 ] == 6 and koRes.shape[ 1 ] == 5 ) :
+      #   koRes = voNP.delete( koRes, ( koRes.shape[ 0 ] - 1 ), 0 )
 
       # Create return matrix
       koRet = TcMatrix( koRes.shape[ 0 ], koRes.shape[ 1 ] )

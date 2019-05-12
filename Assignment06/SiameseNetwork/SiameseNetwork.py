@@ -12,7 +12,7 @@ from TcLayerC import TcLayerC
 from TcCNNSiamese import TcCNNSiamese
 from TcMatrix import TcMatrix
 
-def MReadMNIST( aoPath ) :
+def MReadATT( aoPath ) :
    # Create empty of images and expected output
    kdX = []
    kdY = []
@@ -21,9 +21,12 @@ def MReadMNIST( aoPath ) :
    kiI = 0
    for koFilename in os.listdir( aoPath ) :
       kdX.append( cv2.imread( aoPath + '{0}'.format( koFilename ), 0 ) / 255.0 )
-      kdY.append( voNP.zeros( ( 10, 1 ) ) )
-      kiY = int( koFilename[ 0 ] )     
-      kdY[ kiI ][ kiY ] = 1.0
+      kdY.append( voNP.zeros( ( 40, 1 ) ) )
+      kiY = int( koFilename.split( '_' )[ 0 ][ 1: ] )
+      kdY[ kiI ][ kiY - 1 ] = 1.0
+      #kdY.append( voNP.zeros( ( 10, 1 ) ) )
+      #kiY = int( koFilename[ 1 ] )
+      #kdY[ kiI ][ kiY ] = 1.0
       kiI = kiI + 1
 
    return( kdX, kdY )
@@ -32,15 +35,17 @@ def MIsMatch( aoArgs ) :
    koCNN  = aoArgs[ 0 ]
    koPath = aoArgs[ 1 ]
    koFile = aoArgs[ 2 ]
-
-   kdX = cv2.imread( koPath + '{0}'.format( koFile ), 0 ) / 255.0
-   kdY = voNP.zeros( ( 10, 1 ) )
-   kiY = int( koFile[ 0 ] )
+   kdY = voNP.zeros( ( 40, 1 ) )
+   kiY = int( koFile.split( '_' )[ 0 ][ 1: ] )
+   kdY[ kiI ][ kiY - 1 ] = 1.0
+   #kdX = cv2.imread( koPath + '{0}'.format( koFile ), 0 ) / 255.0
+   #kiY = int( koFile[ 1 ] )
+   #kdY[ kiI ][ kiY ] = 1.0
    koX = TcMatrix( kdX.shape[ 0 ], kdX.shape[ 1 ] )
    koX.vdData = kdX
 
    kdRes = koCNN.MNetworkClassifier( koX )
-   return( max( kdRes ) == kdRes[ kiY ] )
+   return( max( kdRes ) == kdRes[ kiY - 1 ] )
 
 def MComputeAccuracy( aoCNN, aoPath ) :
    freeze_support( )
@@ -63,37 +68,43 @@ def MComputeAccuracy( aoCNN, aoPath ) :
    return( ( kdAccuracy / kdTotal ) * 100.0 )
 
 def main( ) :
-   #Set location of MNIST data
-   koMNIST = '../../MNIST/'
+   # Set location of ATT data
+   koATT = '../../ATTFaceDataSet/'
+   #koATT = '../../MNIST/'
 
    # Settings for Deep Convolutional Neural Network (Accuracy should be ~92%)
    kiSizeBatch = 5
    kiSizeKernl = 5   # Size of the kernel
-   kiCountFML1 = 6   # Feature Maps in first layer
-   kiCountFML2 = 12  # Feature Maps in second layer
 
    # Create a list of CNN Layers
    koCNNLayers = [ ]
-   koCNNLayers.append( TcLayerC( ( kiCountFML1, 1 ), ( 28, kiSizeKernl ), TePool.XeAvg, TeActivation.XeRELU ) )
-   koCNNLayers.append( TcLayerC( ( kiCountFML2, kiCountFML1 ), ( 12, kiSizeKernl ), TePool.XeAvg, TeActivation.XeRELU ) )
+   koCNNLayers.append( TcLayerC( ( 32,  1 ), ( 92, 112, kiSizeKernl ), TePool.XeAvg, TeActivation.XeRELU ) )
+   koCNNLayers.append( TcLayerC( ( 64, 32 ), ( 44,  54, kiSizeKernl ), TePool.XeAvg, TeActivation.XeRELU ) )
+   #koCNNLayers.append( TcLayerC( ( 24, 12 ), ( 20,  25, kiSizeKernl ), TePool.XeAvg, TeActivation.XeRELU ) )
+   #koCNNLayers.append( TcLayerC( (  6,  1 ), ( 28, 28, kiSizeKernl ), TePool.XeAvg, TeActivation.XeRELU ) )
+   #koCNNLayers.append( TcLayerC( ( 12,  6 ), ( 12, 12, kiSizeKernl ), TePool.XeAvg, TeActivation.XeRELU ) )
 
    # Create a list of NN Layers. The second CNN layer produces an output of 4x4 per Feature Map
    koNNLayers = [ ]
-   koNNLayers.append( TcLayer( ( 50, 4 * 4 * kiCountFML2 ), TeActivation.XeRELU, 0.8 ) )
-   koNNLayers.append( TcLayer( ( 10, 50 ), TeActivation.XeSoftMax, 1 ) )
+   koNNLayers.append( TcLayer( ( 500, 40000 ), TeActivation.XeRELU, 0.8 ) )
+   koNNLayers.append( TcLayer( ( 40, 500 ), TeActivation.XeSoftMax, 1 ) )
+   #koNNLayers.append( TcLayer( ( 50, 192 ), TeActivation.XeRELU, 0.8 ) )
+   #koNNLayers.append( TcLayer( ( 10, 50 ), TeActivation.XeSoftMax, 1 ) )
 
    # Read MNist Training Data Set
-   kdTrainX, kdTrainY = MReadMNIST( koMNIST + 'Training1000/' )
+   kdTrainX, kdTrainY = MReadATT( koATT + 'Training/' )
+   #kdTrainX, kdTrainY = MReadATT( koATT + 'Training1000/' )
 
    # Create Deep CNN
    koCNN = TcCNNSiamese( koCNNLayers, koNNLayers )
 
    # Train the CNN
-   koCNN.MTrainModel( kdTrainX, kdTrainY, 30, 0.1, kiSizeBatch )
-   koCNN.MTrainClassifier( kdTrainX, kdTrainY, 50, 0.1, kiSizeBatch )
+   koCNN.MTrainModel( kdTrainX, kdTrainY, 5, 0.1, kiSizeBatch )
+   koCNN.MTrainClassifier( kdTrainX, kdTrainY, 5, 0.1, kiSizeBatch )
 
    # Test the CNN
-   kdAccuracy = MComputeAccuracy( koCNN, koMNIST + 'Test10000/' )
+   kdAccuracy = MComputeAccuracy( koCNN, koATT + 'Testing/' )
+   #kdAccuracy = MComputeAccuracy( koCNN, koATT + 'Test10000/' )
 
    # Print Result Accuracy
    print( "Accuracy: ", kdAccuracy, "%")

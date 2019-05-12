@@ -269,12 +269,13 @@ class TcCNNSiamese( object ) :
                for kiQ in range( len( koLayer.voFM ) ) :
                   koGk = koLayer.voKernelsG[ kiP ][ kiQ ].vdData
                   koMat = koPrev.voFM[ kiP ].voOutputSS.MRotate90( ).MRotate90( )
-                  koGk += koMat.MConvolve( koLayer.voFM[ kiQ ].voDeltaCV ).vdData
+                  koGk += koMat.MConvolve( koLayer.voFM[ kiQ ].voDeltaCV, 'valid' ).vdData
 
             # Backpropagate to prev CNN Layer
             for kiP in range( len( koPrev.voFM ) ) :
-               kiSize = koPrev.voFM[ kiP ].voOutputSS.viRows
-               koPrev.voFM[ kiP ].voDeltaSS = TcMatrix( kiSize, kiSize )
+               kiWidth = koPrev.voFM[ kiP ].voOutputSS.viRows
+               kiHeight = koPrev.voFM[ kiP ].voOutputSS.viCols
+               koPrev.voFM[ kiP ].voDeltaSS = TcMatrix( kiWidth, kiHeight )
                for kiQ in range( len( koLayer.voFM ) ) :
                   koMdss = koPrev.voFM[ kiP ].voDeltaSS.vdData
                   koKernel = koLayer.voKernels[ kiP ][ kiQ ].MRotate90( ).MRotate90( )
