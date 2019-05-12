@@ -134,7 +134,7 @@ def MTrainAndTestMNIST( aiSizeBatch, aiSizeKernel ) :
    koCNN.MTrainClassifier( kdTrainX, kdTrainY, 50, 0.1, aiSizeBatch )
 
    # Test the CNN
-   kdAccuracy = MComputeAccuracy( koCNN, koDataset + 'Test10000/' )
+   kdAccuracy = MComputeAccuracyMNIST( koCNN, koDataset + 'Test10000/' )
 
    # Print Result Accuracy
    print( "Accuracy: ", kdAccuracy, "%")
@@ -167,7 +167,7 @@ def MTrainAndTestATT( aiSizeBatch, aiSizeKernel ) :
    koCNN.MTrainClassifier( kdTrainX, kdTrainY, 1000, 0.1, aiSizeBatch )
 
    # Test the CNN
-   kdAccuracy = MComputeAccuracy( koCNN, koDataset + 'Testing/' )
+   kdAccuracy = MComputeAccuracyATT( koCNN, koDataset + 'Testing/' )
 
    # Print Result Accuracy
    print( "Accuracy: ", kdAccuracy, "%")
