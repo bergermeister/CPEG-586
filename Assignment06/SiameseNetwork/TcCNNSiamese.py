@@ -36,8 +36,9 @@ class TcCNNSiamese( object ) :
          aorSelf.voLayersC[ kiI ].MForwardPass( kdPrevOut )
 
       # Flatten each feature map in the CNN Layer and assemble all maps into an nx1 vector
-      kiSizeOut  = aorSelf.voLayersC[ kiCountC - 1 ].voFM[ 0 ].voOutputSS.viRows       # Get the size of the feature map output
-      kiSizeFlat = ( kiSizeOut ** 2 ) * len( aorSelf.voLayersC[ kiCountC - 1 ].voFM )  # Calculate the size of the flattened vector
+      kiSizeOutH = aorSelf.voLayersC[ kiCountC - 1 ].voFM[ 0 ].voOutputSS.viRows       # Get the size of the feature map output
+      kiSizeOutW = aorSelf.voLayersC[ kiCountC - 1 ].voFM[ 0 ].voOutputSS.viCols       # Get the size of the feature map output
+      kiSizeFlat = ( kiSizeOutW * kiSizeOutH ) * len( aorSelf.voLayersC[ kiCountC - 1 ].voFM )  # Calculate the size of the flattened vector
       aorSelf.voFlatten = TcMatrix( kiSizeFlat, 1 )                                    # Create the flattened vector
       kiF = 0
       for koFM in aorSelf.voLayersC[ kiCountC - 1 ].voFM :                             # For each feature map in the last layer
